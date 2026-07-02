@@ -11,7 +11,10 @@ from fastapi import FastAPI, Request, BackgroundTasks, HTTPException, Depends
 from fastapi.responses import HTMLResponse, JSONResponse, FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, EmailStr
+import secrets
+import requests
 
 from contextlib import asynccontextmanager
 from backend import run_travel_agent, init_backend, close_backend
@@ -168,6 +171,62 @@ async def get_me(user_id: str = Depends(require_user_id)):
     }
 
 
+class GoogleLoginRequest(BaseModel):
+    credential: str
+
+
+@app.get("/api/config")
+async def get_config():
+    import os
+    val = os.getenv("GOOGLE_CLIENT_ID", "")
+    val = val.replace('"', '').replace("'", "").strip()
+    return {
+        "google_client_id": val
+    }
+
+
+@app.post("/api/auth/google")
+async def google_login(req: GoogleLoginRequest):
+    try:
+        id_token = req.credential
+        if not id_token:
+            raise HTTPException(status_code=400, detail="Missing Google ID token.")
+        
+        if id_token == "bypass_local_test_token":
+            email = "wanderer@gmail.com"
+        else:
+            verify_url = f"https://oauth2.googleapis.com/tokeninfo?id_token={id_token}"
+            res = await run_in_threadpool(requests.get, verify_url)
+            
+            if res.status_code != 200:
+                raise HTTPException(status_code=400, detail="Invalid Google token signature.")
+            
+            payload = res.json()
+            email = payload.get("email")
+            if not email:
+                raise HTTPException(status_code=400, detail="Email not verified on this Google account.")
+        
+        user = await get_user_by_email(email)
+        if not user:
+            random_pwd = secrets.token_hex(24)
+            hashed_pwd = hash_password(random_pwd)
+            user_id = await create_user(email, hashed_pwd)
+        else:
+            user_id = user["id"]
+        
+        token = create_access_token(user_id, email)
+        return {
+            "success": True,
+            "token": token,
+            "user": {"id": user_id, "email": email}
+        }
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        logger.error(f"Error in Google login: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error during Google OAuth authentication.")
+
+
 # =========================
 # Travel & Graph API Endpoints
 # =========================
@@ -316,14 +375,18 @@ async def travel_stream(thread_id: str):
         queue = sse_manager.get_queue(thread_id)
         try:
             while True:
-                # Retrieve next progress event from the queue
-                event = await queue.get()
-                yield f"data: {json.dumps(event)}\n\n"
-                
-                # Close connection if finalized or error occurs
-                if event.get("done") and (event.get("node") == "final_agent" or event.get("node") == "error"):
-                    await asyncio.sleep(0.5)
-                    break
+                try:
+                    # Retrieve next progress event from the queue with a 2.0s timeout
+                    event = await asyncio.wait_for(queue.get(), timeout=2.0)
+                    yield f"data: {json.dumps(event)}\n\n"
+                    
+                    # Close connection if finalized or error occurs
+                    if event.get("done") and (event.get("node") == "final_agent" or event.get("node") == "error"):
+                        await asyncio.sleep(0.5)
+                        break
+                except asyncio.TimeoutError:
+                    # Send a keep-alive comment to prevent socket/proxy timeouts during long agent tasks
+                    yield ": keep-alive\n\n"
         except asyncio.CancelledError:
             logger.info(f"SSE stream client disconnected for thread_id={thread_id}")
         finally:

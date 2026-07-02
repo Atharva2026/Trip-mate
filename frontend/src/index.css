@@ -459,3 +459,291 @@ h1, h2, h3, h4, h5, h6 {
   from { opacity: 0; transform: translateY(12px); }
   to   { opacity: 1; transform: translateY(0); }
 }
+
+/* Ambient background float animations */
+.animate-float-a {
+  animation: float-a 22s ease-in-out infinite;
+}
+.animate-float-b {
+  animation: float-b 28s ease-in-out infinite;
+}
+
+@keyframes float-a {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(35px, -45px) scale(1.08);
+  }
+}
+
+@keyframes float-b {
+  0%, 100% {
+    transform: translate(0, 0) scale(1.05);
+  }
+  50% {
+    transform: translate(-40px, 30px) scale(0.92);
+  }
+}
+
+/* Full-viewport noise/grain overlay */
+.noise-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 5;
+  opacity: 0.03;
+  mix-blend-mode: overlay;
+}
+
+/* Conic Border Card Animation */
+@property --angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+.conic-border-card {
+  position: relative;
+}
+
+.conic-border-card::before {
+  content: '';
+  position: absolute;
+  inset: -1.5px;
+  border-radius: inherit;
+  background: conic-gradient(from var(--angle), #F5A623, transparent 30%, #E8650A, transparent 70%);
+  animation: rotateAngle 3.5s linear infinite;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  pointer-events: none;
+  z-index: -1;
+}
+
+.conic-border-card:hover::before {
+  opacity: 1;
+}
+
+@keyframes rotateAngle {
+  0% {
+    --angle: 0deg;
+  }
+  100% {
+    --angle: 360deg;
+  }
+}
+
+/* Clip-path Reveal Transition */
+.clip-reveal {
+  clip-path: inset(0 100% 0 0);
+  transition: clip-path 950ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.clip-reveal.revealed,
+.revealed .clip-reveal {
+  clip-path: inset(0 0% 0 0);
+}
+
+/* Eyebrow Thin Underline Draw-In */
+.eyebrow-underline {
+  position: relative;
+  display: inline-block;
+}
+
+.eyebrow-underline::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: -2.5px;
+  width: 100%;
+  height: 1px;
+  background-color: var(--accent-secondary);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 900ms cubic-bezier(0.16, 1, 0.3, 1) 250ms;
+}
+
+.revealed .eyebrow-underline::after {
+  transform: scaleX(1);
+}
+
+/* Pulsing Textarea Focus Glow */
+@keyframes focusPulse {
+  0%, 100% {
+    box-shadow: 0 0 16px rgba(245, 166, 35, 0.12);
+    border-color: rgba(245, 166, 35, 0.35);
+  }
+  50% {
+    box-shadow: 0 0 24px rgba(245, 166, 35, 0.28);
+    border-color: rgba(245, 166, 35, 0.7);
+  }
+}
+
+.textarea-pulse-focus:focus {
+  animation: focusPulse 2.5s infinite ease-in-out;
+  background-color: rgba(13, 27, 42, 0.85);
+}
+
+/* Button Sweep Shimmer */
+.shimmer-btn {
+  position: relative;
+  overflow: hidden;
+}
+
+.shimmer-btn::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -150%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.18) 30%,
+    rgba(255, 255, 255, 0.4) 50%,
+    rgba(255, 255, 255, 0.18) 70%,
+    transparent
+  );
+  transform: skewX(-25deg);
+  animation: shimmerSweep 4.5s infinite linear;
+}
+
+@keyframes shimmerSweep {
+  0% {
+    left: -150%;
+  }
+  25%, 100% {
+    left: 150%;
+  }
+}
+
+/* Sonar Ping expansion */
+@keyframes sonarPing {
+  0% {
+    r: 10px;
+    opacity: 0.85;
+    stroke: #E8650A;
+  }
+  100% {
+    r: 148px;
+    opacity: 0;
+    stroke: #F5A623;
+  }
+}
+
+.sonar-ping-ring {
+  animation: sonarPing 6s cubic-bezier(0.1, 0.8, 0.3, 1) infinite;
+}
+
+/* Drawn checkmark keyframe */
+@keyframes drawCheckmark {
+  from {
+    stroke-dashoffset: 40;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.draw-checkmark-path {
+  stroke-dasharray: 40;
+  stroke-dashoffset: 40;
+  animation: drawCheckmark 500ms cubic-bezier(0.4, 0, 0.2, 1) forwards 150ms;
+}
+
+/* Infinite Horizontal Marquee */
+.marquee-container {
+  overflow: hidden;
+  white-space: nowrap;
+  position: relative;
+  width: 100%;
+}
+
+.marquee-content {
+  display: inline-block;
+  animation: marqueeContinuous 28s linear infinite;
+}
+
+.marquee-content span {
+  display: inline-block;
+  padding-right: 2rem;
+}
+
+@keyframes marqueeContinuous {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  100% {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+/* Option selection ripple pulse */
+@keyframes optionRipple {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(232, 101, 10, 0.4);
+  }
+  50% {
+    transform: scale(1.03);
+    box-shadow: 0 0 16px 5px rgba(232, 101, 10, 0.6);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(232, 101, 10, 0);
+  }
+}
+
+.option-select-ripple {
+  animation: optionRipple 250ms ease-out forwards;
+}
+
+/* Orchestration process progress line */
+.process-connector-line {
+  position: absolute;
+  top: 50%;
+  left: 12%;
+  right: 12%;
+  height: 2px;
+  background: rgba(30, 41, 59, 0.3);
+  z-index: 0;
+  transform: translateY(-50%);
+}
+
+.process-connector-line-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #E8650A, #F5A623);
+  width: 0%;
+  transition: width 1.6s cubic-bezier(0.16, 1, 0.3, 1) 250ms;
+  box-shadow: 0 0 10px rgba(245, 166, 35, 0.6);
+}
+
+.revealed .process-connector-line-fill {
+  width: 100%;
+}
+
+/* Hover scale/bounce step cards */
+.step-card-hover {
+  transition: transform 400ms cubic-bezier(0.34, 1.56, 0.64, 1), border-color 300ms ease;
+  position: relative;
+  z-index: 10;
+}
+
+.step-card-hover:hover {
+  transform: translateY(-8px);
+  border-color: rgba(245, 166, 35, 0.45);
+  box-shadow: 0 12px 24px -10px rgba(245, 166, 35, 0.15);
+}
+
+.step-card-hover:hover .step-icon-container {
+  animation: iconBounce 600ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes iconBounce {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.2) translateY(-4px); }
+}

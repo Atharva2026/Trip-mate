@@ -182,6 +182,54 @@ const calculateDestination = (ans) => {
   };
 };
 
+// Magnetic button hook helper
+function useMagneticButton() {
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const btn = ref.current;
+    if (!btn) return;
+
+    const handleMouseMove = (e) => {
+      const rect = btn.getBoundingClientRect();
+      const x = e.clientX - rect.left - rect.width / 2;
+      const y = e.clientY - rect.top - rect.height / 2;
+
+      // Calculate distance from center
+      const dist = Math.sqrt(x * x + y * y);
+      if (dist < 80) { // activation radius
+        // Interpolate offset up to 8px
+        const pullX = (x / (rect.width / 2)) * 8;
+        const pullY = (y / (rect.height / 2)) * 8;
+        btn.style.transform = `translate3d(${pullX}px, ${pullY}px, 0)`;
+      } else {
+        btn.style.transform = 'translate3d(0, 0, 0)';
+      }
+    };
+
+    const handleMouseLeave = () => {
+      btn.style.transform = 'translate3d(0, 0, 0)';
+      btn.style.transition = 'transform 350ms cubic-bezier(0.34, 1.56, 0.64, 1)';
+    };
+
+    const handleMouseEnter = () => {
+      btn.style.transition = 'none';
+    };
+
+    btn.addEventListener('mousemove', handleMouseMove);
+    btn.addEventListener('mouseleave', handleMouseLeave);
+    btn.addEventListener('mouseenter', handleMouseEnter);
+
+    return () => {
+      btn.removeEventListener('mousemove', handleMouseMove);
+      btn.removeEventListener('mouseleave', handleMouseLeave);
+      btn.removeEventListener('mouseenter', handleMouseEnter);
+    };
+  }, []);
+
+  return ref;
+}
+
 const DURATION = 8000;
 
 export default function LandingPage() {
@@ -192,6 +240,15 @@ export default function LandingPage() {
   const [textVisible, setTextVisible] = useState(true);
   const [progressKey, setProgressKey] = useState(0);
   const [demoInput, setDemoInput] = useState('');
+
+  // Magnetic button hooks
+  const planNowRef = useMagneticButton();
+  const generateRef = useMagneticButton();
+  const planThisRef = useMagneticButton();
+
+  // Typewriter states
+  const [placeholder, setPlaceholder] = useState("");
+  const [isFocused, setIsFocused] = useState(false);
 
   // Globe Recommendation Quiz States
   const [quizStep, setQuizStep] = useState(1);
@@ -204,21 +261,103 @@ export default function LandingPage() {
   });
   const [quizRecommendation, setQuizRecommendation] = useState(null);
   const [slideStatus, setSlideStatus] = useState('static'); // 'static', 'merging', 'active'
+  const [selectedOptionVal, setSelectedOptionVal] = useState(null);
 
   const autoTimer = useRef(null);
   const scrollRef = useRef(null);
 
   const handleSelectOption = (key, value) => {
-    const nextAnswers = { ...quizAnswers, [key]: value };
-    setQuizAnswers(nextAnswers);
+    setSelectedOptionVal(value);
+    
+    setTimeout(() => {
+      const nextAnswers = { ...quizAnswers, [key]: value };
+      setQuizAnswers(nextAnswers);
+      setSelectedOptionVal(null);
 
-    if (quizStep < 5) {
-      setQuizStep(quizStep + 1);
-    } else {
-      const rec = calculateDestination(nextAnswers);
-      setQuizRecommendation(rec);
-      setQuizStep(6);
+      if (quizStep < 5) {
+        setQuizStep(quizStep + 1);
+      } else {
+        const rec = calculateDestination(nextAnswers);
+        setQuizRecommendation(rec);
+        setQuizStep(6);
+      }
+    }, 280);
+  };
+
+  // Typewriter loop for empty/unfocused textarea placeholder
+  useEffect(() => {
+    if (isFocused || demoInput) {
+      setPlaceholder("Describe your getaway...");
+      return;
     }
+
+    const PHRASES = [
+      "Plan a 7-day road trip from California to Yosemite, under $2500, focusing on cozy cabins...",
+      "Plan a 5-day romantic escape in the Swiss Alps, with budget hotels and quiet spots...",
+      "Describe a 10-day cultural journey in Kyoto, Japan, with temple visits and sushi places...",
+      "Create a weekend getaway package in Marrakech, Merzouga, under ₹50,000 per person..."
+    ];
+
+    let phraseIdx = 0;
+    let charIdx = 0;
+    let isDeleting = false;
+    let timeoutId = null;
+
+    const tick = () => {
+      const currentPhrase = PHRASES[phraseIdx];
+      
+      if (!isDeleting) {
+        setPlaceholder(currentPhrase.substring(0, charIdx + 1));
+        charIdx++;
+        
+        if (charIdx === currentPhrase.length) {
+          isDeleting = true;
+          timeoutId = setTimeout(tick, 2000);
+        } else {
+          timeoutId = setTimeout(tick, 40);
+        }
+      } else {
+        setPlaceholder(currentPhrase.substring(0, charIdx - 1));
+        charIdx--;
+        
+        if (charIdx === 0) {
+          isDeleting = false;
+          phraseIdx = (phraseIdx + 1) % PHRASES.length;
+          timeoutId = setTimeout(tick, 450);
+        } else {
+          timeoutId = setTimeout(tick, 25);
+        }
+      }
+    };
+
+    tick();
+
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [isFocused, demoInput]);
+
+  // 3D tilt mouse handlers for cards
+  const handleTiltMouseMove = (e) => {
+    const card = e.currentTarget;
+    const rect = card.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    const xc = rect.width / 2;
+    const yc = rect.height / 2;
+    
+    const rotateX = -((y - yc) / yc) * 6;
+    const rotateY = ((x - xc) / xc) * 6;
+    
+    card.style.transform = `perspective(800px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
+    card.style.transition = 'none';
+  };
+
+  const handleTiltMouseLeave = (e) => {
+    const card = e.currentTarget;
+    card.style.transform = 'perspective(800px) rotateX(0deg) rotateY(0deg)';
+    card.style.transition = 'transform 450ms cubic-bezier(0.16, 1, 0.3, 1)';
   };
 
   // Mouse ambient spotlight glow state
@@ -318,6 +457,17 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen bg-[#0D1B2A] text-slate-200 font-sans selection:bg-[#F5A623]/30 selection:text-[#a06f40]">
 
+      {/* Film Grain Noise Overlay */}
+      <div className="noise-overlay">
+        <svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
+          <filter id="noiseFilter">
+            <feTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" stitchTiles="stitch" />
+            <feColorMatrix type="matrix" values="0 0 0 0 0   0 0 0 0 0   0 0 0 0 0  0 0 0 0.03 0" />
+          </filter>
+          <rect width="100%" height="100%" filter="url(#noiseFilter)" />
+        </svg>
+      </div>
+
       {/* ── TOP READING SCROLL PROGRESS BAR ── */}
       <div className="fixed top-0 left-0 right-0 h-[2px] z-[101] bg-transparent">
         <div
@@ -337,7 +487,7 @@ export default function LandingPage() {
       />
 
       {/* ── TOP LOADING PROGRESS BAR ── */}
-      <div className="fixed top-0 left-0 right-0 h-[3px] z-[100] bg-slate-900/60/10">
+      <div className="fixed top-0 left-0 right-0 h-[3px] z-[100] bg-slate-900/10">
         <div
           key={progressKey}
           className="h-full bg-[#F5A623]"
@@ -379,8 +529,9 @@ export default function LandingPage() {
             My Trips
           </button>
           <button
+            ref={planNowRef}
             onClick={() => navigate('/planner')}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-full text-[10px] font-bold tracking-[0.15em] uppercase transition-all shadow-md"
+            className="flex items-center gap-2 px-5 py-2.5 rounded-full text-[10px] font-bold tracking-[0.15em] uppercase transition-all shadow-md cursor-pointer"
             style={{ background: '#F5A623', color: '#fff' }}
             onMouseEnter={e => e.currentTarget.style.background = '#c39263'}
             onMouseLeave={e => e.currentTarget.style.background = '#F5A623'}>
@@ -458,7 +609,7 @@ export default function LandingPage() {
                 }}>
                 <button
                   onClick={() => navigate('/planner')}
-                  className="flex items-center gap-2 px-6 py-3.5 rounded-full text-[10px] font-bold tracking-[0.2em] text-white uppercase transition-all bg-slate-900/60/10 hover:bg-slate-900/60/20 border border-white/30 backdrop-blur-md">
+                  className="flex items-center gap-2 px-6 py-3.5 rounded-full text-[10px] font-bold tracking-[0.2em] text-white uppercase transition-all bg-slate-900/10 hover:bg-slate-900/20 border border-white/30 backdrop-blur-md cursor-pointer">
                   <span>Discover Location</span>
                   <div className="w-6 h-6 rounded-full bg-[#F5A623] flex items-center justify-center">
                     <MapPin size={11} className="text-black" />
@@ -536,10 +687,10 @@ export default function LandingPage() {
         {/* Bottom controls & mouse down indicator */}
         <div className="absolute bottom-8 left-6 lg:left-12 right-6 lg:right-12 z-30 flex items-end justify-between">
           <div className="flex items-center gap-3">
-            <button onClick={back} className="w-10 h-10 rounded-full border border-white/30 hover:border-white/60 bg-slate-900/60/5 hover:bg-slate-900/60/15 text-white transition-all flex items-center justify-center">
+            <button onClick={back} className="w-10 h-10 rounded-full border border-white/30 hover:border-white/60 bg-slate-900/5 hover:bg-slate-900/15 text-white transition-all flex items-center justify-center cursor-pointer">
               <ChevronLeft size={16} />
             </button>
-            <button onClick={next} className="w-10 h-10 rounded-full border border-white/30 hover:border-white/60 bg-slate-900/60/5 hover:bg-slate-900/60/15 text-white transition-all flex items-center justify-center">
+            <button onClick={next} className="w-10 h-10 rounded-full border border-white/30 hover:border-white/60 bg-slate-900/5 hover:bg-slate-900/15 text-white transition-all flex items-center justify-center cursor-pointer">
               <ChevronRight size={16} />
             </button>
           </div>
@@ -567,16 +718,16 @@ export default function LandingPage() {
 
         {/* Ambient glow details in background */}
         <div className="fixed inset-0 pointer-events-none z-[-1] overflow-hidden opacity-30">
-          <div className="absolute top-[40%] right-[10%] w-[500px] h-[500px] rounded-full bg-[#F5A623]/5 blur-[90px]" />
-          <div className="absolute bottom-[20%] left-[5%] w-[450px] h-[450px] rounded-full bg-sky-500/5 blur-[90px]" />
+          <div className="absolute top-[40%] right-[10%] w-[500px] h-[500px] rounded-full bg-[#F5A623]/5 blur-[90px] animate-float-a" />
+          <div className="absolute bottom-[20%] left-[5%] w-[450px] h-[450px] rounded-full bg-sky-500/5 blur-[90px] animate-float-b" />
         </div>
 
         {/* ── EDITORIAL STORY 1: CURATE YOUR ESCAPE (Split layout) ── */}
         <section className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-center reveal-on-scroll">
           <div className="lg:col-span-5 space-y-6">
             <div className="flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#F5A623]" />
-              <span className="text-[10px] font-bold tracking-[0.25em] text-[#F5A623] uppercase font-mono">Curated Escapes</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-[#F5A623] animate-pulse" />
+              <span className="text-[10px] font-bold tracking-[0.25em] text-[#F5A623] uppercase font-mono eyebrow-underline">Curated Escapes</span>
             </div>
             <h2 className="text-3xl lg:text-5xl font-extrabold text-white tracking-tight leading-tight" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
               Every Detail.<br />
@@ -591,7 +742,7 @@ export default function LandingPage() {
             <div className="pt-2">
               <button
                 onClick={() => navigate('/planner')}
-                className="flex items-center gap-2.5 px-6 py-3 rounded-full text-xs font-bold tracking-widest text-white uppercase transition-all shadow-md"
+                className="flex items-center gap-2.5 px-6 py-3 rounded-full text-xs font-bold tracking-widest text-white uppercase transition-all shadow-md cursor-pointer"
                 style={{ background: '#0f172a' }}
                 onMouseEnter={e => e.currentTarget.style.background = '#334155'}
                 onMouseLeave={e => e.currentTarget.style.background = '#0f172a'}>
@@ -603,15 +754,15 @@ export default function LandingPage() {
 
           <div className="lg:col-span-7">
             {/* Flatlay image display frame */}
-            <div className="relative rounded-3xl overflow-hidden shadow-2xl border border-slate-800 bg-slate-900/60 p-3 group">
+            <div className="relative rounded-3xl overflow-hidden shadow-2xl border border-slate-800 bg-slate-900/60 p-3 group reveal-on-scroll">
               <div className="absolute inset-0 bg-gradient-to-tr from-[#F5A623]/10 to-transparent pointer-events-none rounded-3xl" />
               <img
                 src="/hero-flatlay.png"
                 alt="Travel Preparation Flatlay"
-                className="w-full aspect-[4/3] object-cover rounded-2xl transition-transform duration-700 group-hover:scale-[1.02]"
+                className="w-full aspect-[4/3] object-cover rounded-2xl animate-slow-zoom-pan clip-reveal"
               />
               {/* Badge Overlay */}
-              <div className="absolute top-6 left-6 px-3 py-1.5 rounded-lg bg-slate-900/60/90 backdrop-blur-md shadow-sm border border-slate-800 text-[10px] font-bold tracking-widest text-slate-800 uppercase flex items-center gap-1.5 font-mono">
+              <div className="absolute top-6 left-6 px-3 py-1.5 rounded-lg bg-slate-900/90 backdrop-blur-md shadow-sm border border-slate-800 text-[10px] font-bold tracking-widest text-slate-300 uppercase flex items-center gap-1.5 font-mono">
                 <Compass size={11} className="text-[#F5A623] animate-spin-slow" />
                 <span>The Art of Wandering</span>
               </div>
@@ -623,14 +774,14 @@ export default function LandingPage() {
         <section className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-center reveal-on-scroll">
           <div className="lg:col-span-7 order-last lg:order-first">
             {/* Mood Board frame */}
-            <div className="relative rounded-3xl overflow-hidden shadow-2xl border border-slate-800 bg-slate-900/60 p-3 group">
+            <div className="relative rounded-3xl overflow-hidden shadow-2xl border border-slate-800 bg-slate-900/60 p-3 group reveal-on-scroll">
               <div className="absolute inset-0 bg-gradient-to-bl from-sky-500/5 to-transparent pointer-events-none rounded-3xl" />
               <img
                 src="/travel-board.png"
                 alt="Travel Mood Board"
-                className="w-full aspect-[4/3] object-cover rounded-2xl transition-transform duration-700 group-hover:scale-[1.02]"
+                className="w-full aspect-[4/3] object-cover rounded-2xl animate-slow-zoom-pan clip-reveal"
               />
-              <div className="absolute bottom-6 right-6 px-3.5 py-2 rounded-lg bg-slate-900/95 backdrop-blur-md shadow-sm text-[10px] font-bold tracking-widest text-white uppercase flex items-center gap-1.5 font-mono">
+              <div className="absolute bottom-6 right-6 px-3.5 py-2 rounded-lg bg-slate-900/90 backdrop-blur-md shadow-sm text-[10px] font-bold tracking-widest text-slate-350 uppercase flex items-center gap-1.5 font-mono">
                 <BookmarkCheck size={12} className="text-[#F5A623]" />
                 <span>Inspiration Board</span>
               </div>
@@ -639,8 +790,8 @@ export default function LandingPage() {
 
           <div className="lg:col-span-5 space-y-6">
             <div className="flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-sky-500" />
-              <span className="text-[10px] font-bold tracking-[0.25em] text-[#E8650A] uppercase font-mono">Visual Planning</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-sky-500 animate-pulse" />
+              <span className="text-[10px] font-bold tracking-[0.25em] text-[#E8650A] uppercase font-mono eyebrow-underline">Visual Planning</span>
             </div>
             <h2 className="text-3xl lg:text-5xl font-extrabold text-white tracking-tight leading-tight" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
               Visual Pinboards.<br />
@@ -655,7 +806,7 @@ export default function LandingPage() {
             <div className="pt-2">
               <button
                 onClick={() => navigate('/planner')}
-                className="flex items-center gap-2.5 px-6 py-3 rounded-full text-xs font-bold tracking-widest text-slate-200 bg-slate-900/60 hover:bg-slate-900/50 border border-slate-800 uppercase transition-all shadow-sm">
+                className="flex items-center gap-2.5 px-6 py-3 rounded-full text-xs font-bold tracking-widest text-slate-200 bg-slate-900/60 hover:bg-slate-900/50 border border-slate-800 uppercase transition-all shadow-sm cursor-pointer">
                 <span>Try Demo Board</span>
                 <ExternalLink size={12} />
               </button>
@@ -676,14 +827,18 @@ export default function LandingPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {/* Coastal Escapes */}
-            <div className="rounded-2xl overflow-hidden bg-slate-900/60 shadow-md border border-slate-800 hover:shadow-xl transition-all duration-300 flex flex-col justify-between group">
+            <div
+              onMouseMove={handleTiltMouseMove}
+              onMouseLeave={handleTiltMouseLeave}
+              className="conic-border-card rounded-2xl overflow-hidden bg-slate-900/60 shadow-md border border-slate-800 hover:shadow-xl transition-all duration-300 flex flex-col justify-between group cursor-pointer"
+            >
               <div>
                 <div className="relative overflow-hidden aspect-video">
                   <img src="/beach-sunset.png" alt="Coastal Escapes" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
                   <span className="absolute top-3 left-3 px-2 py-1 rounded text-[8px] font-bold tracking-widest text-white uppercase bg-slate-900/85 backdrop-blur-sm font-mono">Beach</span>
                 </div>
                 <div className="p-6 space-y-2">
-                  <h4 className="font-bold text-slate-800 text-sm">Coastal Escapes</h4>
+                  <h4 className="font-bold text-white text-sm">Coastal Escapes</h4>
                   <p className="text-xs text-slate-400 leading-relaxed">
                     Sunrise dunes, turquoise waters, and coastal villages. Discover ocean breeze retreats with live booking connections.
                   </p>
@@ -692,21 +847,25 @@ export default function LandingPage() {
               <div className="p-6 pt-0">
                 <button
                   onClick={() => navigate('/planner', { state: { prefill: 'Plan a 5-day beach holiday in Tarifa, Spain under €1000' } })}
-                  className="w-full text-center py-2.5 rounded-lg text-[10px] font-bold tracking-wider text-[#F5A623] bg-[#F5A623]/10 hover:bg-[#F5A623]/20 transition-colors uppercase">
+                  className="w-full text-center py-2.5 rounded-lg text-[10px] font-bold tracking-wider text-[#F5A623] bg-[#F5A623]/10 hover:bg-[#F5A623]/20 transition-colors uppercase cursor-pointer">
                   Explore Beach Escapes
                 </button>
               </div>
             </div>
 
             {/* Off-Grid Road Trip */}
-            <div className="rounded-2xl overflow-hidden bg-slate-900/60 shadow-md border border-slate-800 hover:shadow-xl transition-all duration-300 flex flex-col justify-between group">
+            <div
+              onMouseMove={handleTiltMouseMove}
+              onMouseLeave={handleTiltMouseLeave}
+              className="conic-border-card rounded-2xl overflow-hidden bg-slate-900/60 shadow-md border border-slate-800 hover:shadow-xl transition-all duration-300 flex flex-col justify-between group cursor-pointer"
+            >
               <div>
                 <div className="relative overflow-hidden aspect-video">
                   <img src="/camper-van.png" alt="Off-Grid Adventure" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
                   <span className="absolute top-3 left-3 px-2 py-1 rounded text-[8px] font-bold tracking-widest text-white uppercase bg-slate-900/85 backdrop-blur-sm font-mono">Off-Grid</span>
                 </div>
                 <div className="p-6 space-y-2">
-                  <h4 className="font-bold text-slate-800 text-sm">Road Trips & Camping</h4>
+                  <h4 className="font-bold text-white text-sm">Road Trips & Camping</h4>
                   <p className="text-xs text-slate-400 leading-relaxed">
                     Camper van life, forest trails, and camps under twilight stars. Tailored for mountain passes and wild campgrounds.
                   </p>
@@ -715,21 +874,25 @@ export default function LandingPage() {
               <div className="p-6 pt-0">
                 <button
                   onClick={() => navigate('/planner', { state: { prefill: 'Plan a road trip with scenic camper campgrounds in Yosemite National Park' } })}
-                  className="w-full text-center py-2.5 rounded-lg text-[10px] font-bold tracking-wider text-[#F5A623] bg-[#F5A623]/10 hover:bg-[#F5A623]/20 transition-colors uppercase">
+                  className="w-full text-center py-2.5 rounded-lg text-[10px] font-bold tracking-wider text-[#F5A623] bg-[#F5A623]/10 hover:bg-[#F5A623]/20 transition-colors uppercase cursor-pointer">
                   Explore Campgrounds
                 </button>
               </div>
             </div>
 
             {/* Alpine Sanctuary */}
-            <div className="rounded-2xl overflow-hidden bg-slate-900/60 shadow-md border border-slate-800 hover:shadow-xl transition-all duration-300 flex flex-col justify-between group">
+            <div
+              onMouseMove={handleTiltMouseMove}
+              onMouseLeave={handleTiltMouseLeave}
+              className="conic-border-card rounded-2xl overflow-hidden bg-slate-900/60 shadow-md border border-slate-800 hover:shadow-xl transition-all duration-300 flex flex-col justify-between group cursor-pointer"
+            >
               <div>
                 <div className="relative overflow-hidden aspect-video">
                   <img src="/slide-switzerland.jpg" alt="Alpine Sanctuary" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
                   <span className="absolute top-3 left-3 px-2 py-1 rounded text-[8px] font-bold tracking-widest text-white uppercase bg-slate-900/85 backdrop-blur-sm font-mono">Alpine</span>
                 </div>
                 <div className="p-6 space-y-2">
-                  <h4 className="font-bold text-slate-800 text-sm">Alpine Sanctuaries</h4>
+                  <h4 className="font-bold text-white text-sm">Alpine Sanctuaries</h4>
                   <p className="text-xs text-slate-400 leading-relaxed">
                     Traditional wooden chalets, deep valley stillness, and sky-high mountains. Best for hiking retreats and winter getaways.
                   </p>
@@ -738,7 +901,7 @@ export default function LandingPage() {
               <div className="p-6 pt-0">
                 <button
                   onClick={() => navigate('/planner', { state: { prefill: 'Plan an alpine hiking retreat in Saint Antönien, Switzerland' } })}
-                  className="w-full text-center py-2.5 rounded-lg text-[10px] font-bold tracking-wider text-[#F5A623] bg-[#F5A623]/10 hover:bg-[#F5A623]/20 transition-colors uppercase">
+                  className="w-full text-center py-2.5 rounded-lg text-[10px] font-bold tracking-wider text-[#F5A623] bg-[#F5A623]/10 hover:bg-[#F5A623]/20 transition-colors uppercase cursor-pointer">
                   Explore Valleys
                 </button>
               </div>
@@ -776,9 +939,11 @@ export default function LandingPage() {
               <textarea
                 value={demoInput}
                 onChange={e => setDemoInput(e.target.value)}
-                placeholder="Plan a 7-day road trip from California to Yosemite, under $2500, focusing on cozy cabins and scenic hikes..."
+                placeholder={placeholder}
+                onFocus={() => setIsFocused(true)}
+                onBlur={() => setIsFocused(false)}
                 rows={4}
-                className="w-full rounded-2xl resize-none outline-none text-xs md:text-sm leading-relaxed p-5 border border-slate-805 bg-slate-950/70 focus:border-[#F5A623] focus:ring-2 focus:ring-[#F5A623]/25 transition-all font-sans text-slate-100"
+                className="w-full rounded-2xl resize-none outline-none text-xs md:text-sm leading-relaxed p-5 border border-slate-800 bg-slate-950/70 transition-all font-sans text-slate-100 textarea-pulse-focus"
               />
 
               {/* Quick prefill tags */}
@@ -800,8 +965,9 @@ export default function LandingPage() {
 
               <div className="pt-2">
                 <button
+                  ref={generateRef}
                   onClick={handleDemoGenerate}
-                  className="w-full py-4 rounded-xl text-white font-bold text-xs tracking-widest uppercase transition-all shadow-lg flex items-center justify-center gap-2 group cursor-pointer bg-[#E8650A] hover:bg-[#E8650A]/90 hover:shadow-[0_0_20px_rgba(232,101,10,0.4)]"
+                  className="w-full py-4 rounded-xl text-white font-bold text-xs tracking-widest uppercase transition-all shadow-lg flex items-center justify-center gap-2 group cursor-pointer bg-[#E8650A] hover:bg-[#E8650A]/90 hover:shadow-[0_0_20px_rgba(232,101,10,0.4)] shimmer-btn"
                 >
                   <span>Generate Travel Plan</span>
                   <ArrowRight size={13} className="transition-transform group-hover:translate-x-1" />
@@ -845,7 +1011,8 @@ export default function LandingPage() {
                     className="h-[3px] rounded-full transition-all duration-500"
                     style={{
                       width: step <= quizStep ? '32px' : '12px',
-                      background: step < quizStep ? '#F5A623' : step === quizStep ? '#E8650A' : '#1e293b'
+                      background: step < quizStep ? '#F5A623' : step === quizStep ? '#E8650A' : '#1e293b',
+                      boxShadow: step === quizStep ? '0 0 8px #E8650A, 0 0 15px rgba(232, 101, 10, 0.5)' : 'none'
                     }}
                   />
                 ))}
@@ -870,11 +1037,14 @@ export default function LandingPage() {
                         </div>
 
                         <div className="grid grid-cols-2 gap-2.5">
-                          {q.options.map(option => (
+                          {q.options.map((option, idx) => (
                             <button
-                              key={option.value}
+                              key={`${quizStep}-${option.value}`}
                               onClick={() => handleSelectOption(q.key, option.value)}
-                              className="flex items-center justify-between gap-2 px-4 py-3 rounded-xl border border-slate-800 bg-slate-950/60 hover:bg-[#0f172a] hover:border-[#E8650A]/50 hover:shadow-[0_0_14px_rgba(232,101,10,0.15)] transition-all cursor-pointer group/btn text-left"
+                              className={`flex items-center justify-between gap-2 px-4 py-3 rounded-xl border border-slate-800 bg-slate-950/60 hover:bg-[#0f172a] hover:border-[#E8650A]/50 hover:shadow-[0_0_14px_rgba(232,101,10,0.15)] transition-all cursor-pointer group/btn text-left quiz-option-btn ${
+                                selectedOptionVal === option.value ? 'option-select-ripple' : ''
+                              }`}
+                              style={{ animationDelay: `${idx * 70}ms` }}
                             >
                               <div className="flex items-center gap-2.5">
                                 <span className="text-lg">{option.emoji}</span>
@@ -900,7 +1070,9 @@ export default function LandingPage() {
                 /* Result View */
                 <div className="space-y-6 animate-[fadeIn_0.5s_ease-out]">
                   <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-emerald-900/40 bg-emerald-950/20 text-emerald-400 text-[9px] font-bold tracking-widest uppercase font-mono">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    <svg className="w-2.5 h-2.5 text-emerald-400" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M2.5 6 L5 8.5 L9.5 3.5" className="draw-checkmark-path" />
+                    </svg>
                     Target Acquired
                   </div>
 
@@ -916,8 +1088,9 @@ export default function LandingPage() {
 
                   <div className="flex flex-col sm:flex-row gap-3">
                     <button
+                      ref={planThisRef}
                       onClick={() => navigate('/planner', { state: { prefilledPrompt: quizRecommendation?.query } })}
-                      className="px-6 py-3 rounded-xl bg-[#E8650A] hover:bg-[#E8650A]/90 hover:shadow-[0_0_20px_rgba(232,101,10,0.4)] text-white text-xs font-bold uppercase tracking-widest transition-all cursor-pointer flex items-center justify-center gap-2 group"
+                      className="px-6 py-3 rounded-xl bg-[#E8650A] hover:bg-[#E8650A]/90 hover:shadow-[0_0_20px_rgba(232,101,10,0.4)] text-white text-xs font-bold uppercase tracking-widest transition-all cursor-pointer flex items-center justify-center gap-2 group shimmer-btn"
                     >
                       <span>Plan this Trip</span>
                       <span className="transition-transform group-hover:translate-x-1">→</span>
@@ -1001,9 +1174,16 @@ export default function LandingPage() {
                         fill="url(#sweepFadeGlow)"
                         opacity="0.6"
                       />
+                      {/* Trailing Comet Lines */}
+                      <line x1="160" y1="160" x2="139.4" y2="13.5" stroke="#F5A623" strokeWidth="1" opacity="0.25" />
+                      <line x1="160" y1="160" x2="149.7" y2="12.4" stroke="#F5A623" strokeWidth="1.2" opacity="0.5" />
+
                       {/* Leading scan line */}
                       <line x1="160" y1="160" x2="160" y2="12" stroke="#F5A623" strokeWidth="1.5" opacity="0.9" />
                     </g>
+
+                    {/* Sync’d Expanding Sonar Ping */}
+                    <circle cx="160" cy="160" r="10" stroke="#E8650A" strokeWidth="1.5" fill="none" className="sonar-ping-ring" />
 
                     {/* Center amber glow disc */}
                     <circle cx="160" cy="160" r="30" fill="url(#radarCenterGlow)" />
@@ -1100,60 +1280,82 @@ export default function LandingPage() {
             </h2>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {/* Step 01 */}
-            <div className="p-6 rounded-2xl bg-slate-900/60 shadow-sm border border-slate-800 flex flex-col justify-between min-h-[180px] hover:shadow-md transition-shadow">
-              <div className="space-y-4">
-                <span className="text-[9px] font-bold tracking-widest text-[#F5A623] font-mono">Step 01</span>
-                <div className="w-10 h-10 rounded-xl bg-sky-50 text-[#F5A623] flex items-center justify-center">
-                  <Plane size={18} />
+          <div className="relative">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {/* Step 01 */}
+              <div
+                className="p-6 rounded-2xl bg-slate-900/60 border border-slate-800 flex flex-col justify-between min-h-[180px] reveal-on-scroll step-card-hover"
+                style={{ transitionDelay: '0ms' }}
+              >
+                <div className="space-y-4">
+                  <span className="text-[9px] font-bold tracking-widest text-[#F5A623] font-mono">Step 01</span>
+                  <div className="relative w-10 h-10 rounded-xl overflow-hidden flex items-center justify-center step-icon-container border border-slate-800 shadow-inner">
+                    <img src="/slide-nagano.jpg" className="absolute inset-0 w-full h-full object-cover opacity-25 filter blur-[1px]" />
+                    <div className="absolute inset-0 bg-[#0D1B2A]/40" />
+                    <Plane size={18} className="relative z-10 text-[#F5A623]" />
+                  </div>
+                  <h4 className="font-bold text-white text-sm">Flight Orchestrator</h4>
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    Fetches live routing coordinates via AviationStack and filters options by date, duration, and target budget.
+                  </p>
                 </div>
-                <h4 className="font-bold text-slate-800 text-sm">Flight Orchestrator</h4>
-                <p className="text-xs text-slate-400 leading-relaxed">
-                  Fetches live routing coordinates via AviationStack and filters options by date, duration, and target budget.
-                </p>
               </div>
-            </div>
 
-            {/* Step 02 */}
-            <div className="p-6 rounded-2xl bg-slate-900/60 shadow-sm border border-slate-800 flex flex-col justify-between min-h-[180px] hover:shadow-md transition-shadow">
-              <div className="space-y-4">
-                <span className="text-[9px] font-bold tracking-widest text-[#F5A623] font-mono">Step 02</span>
-                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-500 flex items-center justify-center">
-                  <Hotel size={18} />
+              {/* Step 02 */}
+              <div
+                className="p-6 rounded-2xl bg-slate-900/60 border border-slate-800 flex flex-col justify-between min-h-[180px] reveal-on-scroll step-card-hover"
+                style={{ transitionDelay: '120ms' }}
+              >
+                <div className="space-y-4">
+                  <span className="text-[9px] font-bold tracking-widest text-[#F5A623] font-mono">Step 02</span>
+                  <div className="relative w-10 h-10 rounded-xl overflow-hidden flex items-center justify-center step-icon-container border border-slate-800 shadow-inner">
+                    <img src="/slide-switzerland.jpg" className="absolute inset-0 w-full h-full object-cover opacity-25 filter blur-[1px]" />
+                    <div className="absolute inset-0 bg-[#0D1B2A]/40" />
+                    <Hotel size={18} className="relative z-10 text-emerald-400" />
+                  </div>
+                  <h4 className="font-bold text-white text-sm">Accommodation Researcher</h4>
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    Scans accommodations using Tavily web query filters, matching budget caps and visual styles.
+                  </p>
                 </div>
-                <h4 className="font-bold text-slate-800 text-sm">Accommodation Researcher</h4>
-                <p className="text-xs text-slate-400 leading-relaxed">
-                  Scans accommodations using Tavily web query filters, matching budget caps and visual styles.
-                </p>
               </div>
-            </div>
 
-            {/* Step 03 */}
-            <div className="p-6 rounded-2xl bg-slate-900/60 shadow-sm border border-slate-800 flex flex-col justify-between min-h-[180px] hover:shadow-md transition-shadow">
-              <div className="space-y-4">
-                <span className="text-[9px] font-bold tracking-widest text-[#F5A623] font-mono">Step 03</span>
-                <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-500 flex items-center justify-center">
-                  <CalendarDays size={18} />
+              {/* Step 03 */}
+              <div
+                className="p-6 rounded-2xl bg-slate-900/60 border border-slate-800 flex flex-col justify-between min-h-[180px] reveal-on-scroll step-card-hover"
+                style={{ transitionDelay: '240ms' }}
+              >
+                <div className="space-y-4">
+                  <span className="text-[9px] font-bold tracking-widest text-[#F5A623] font-mono">Step 03</span>
+                  <div className="relative w-10 h-10 rounded-xl overflow-hidden flex items-center justify-center step-icon-container border border-slate-800 shadow-inner">
+                    <img src="/slide-morocco.jpg" className="absolute inset-0 w-full h-full object-cover opacity-25 filter blur-[1px]" />
+                    <div className="absolute inset-0 bg-[#0D1B2A]/40" />
+                    <CalendarDays size={18} className="relative z-10 text-amber-400" />
+                  </div>
+                  <h4 className="font-bold text-white text-sm">Day Route Scheduler</h4>
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    Draws map points and compiles schedules featuring local restaurants, stops, and coordinates.
+                  </p>
                 </div>
-                <h4 className="font-bold text-slate-800 text-sm">Day Route Scheduler</h4>
-                <p className="text-xs text-slate-400 leading-relaxed">
-                  Draws map points and compiles schedules featuring local restaurants, stops, and coordinates.
-                </p>
               </div>
-            </div>
 
-            {/* Step 04 */}
-            <div className="p-6 rounded-2xl bg-slate-900/60 shadow-sm border border-slate-800 flex flex-col justify-between min-h-[180px] hover:shadow-md transition-shadow">
-              <div className="space-y-4">
-                <span className="text-[9px] font-bold tracking-widest text-[#F5A623] font-mono">Step 04</span>
-                <div className="w-10 h-10 rounded-xl bg-violet-50 text-violet-500 flex items-center justify-center">
-                  <Sparkles size={18} />
+              {/* Step 04 */}
+              <div
+                className="p-6 rounded-2xl bg-slate-900/60 border border-slate-800 flex flex-col justify-between min-h-[180px] reveal-on-scroll step-card-hover"
+                style={{ transitionDelay: '360ms' }}
+              >
+                <div className="space-y-4">
+                  <span className="text-[9px] font-bold tracking-widest text-[#F5A623] font-mono">Step 04</span>
+                  <div className="relative w-10 h-10 rounded-xl overflow-hidden flex items-center justify-center step-icon-container border border-slate-800 shadow-inner">
+                    <img src="/slide-yosemite.jpg" className="absolute inset-0 w-full h-full object-cover opacity-25 filter blur-[1px]" />
+                    <div className="absolute inset-0 bg-[#0D1B2A]/40" />
+                    <Sparkles size={18} className="relative z-10 text-violet-400" />
+                  </div>
+                  <h4 className="font-bold text-white text-sm">Critic Auditor</h4>
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    Performs a sanity check on dates, budgets, routing distances, and outputs a formatted plan.
+                  </p>
                 </div>
-                <h4 className="font-bold text-slate-800 text-sm">Critic Auditor</h4>
-                <p className="text-xs text-slate-400 leading-relaxed">
-                  Performs a sanity check on dates, budgets, routing distances, and outputs a formatted plan.
-                </p>
               </div>
             </div>
           </div>
@@ -1161,13 +1363,11 @@ export default function LandingPage() {
 
       </main>
 
-      {/* ══════════════════════════════════════════════
-          FOOTER
-      ══════════════════════════════════════════════ */}
-      <footer className="border-t border-slate-150 bg-slate-900/60 py-12">
+      {/* ── FOOTER ── */}
+      <footer className="border-t border-slate-800 bg-slate-900/60 py-12">
         <div className="max-w-7xl mx-auto px-6 lg:px-12 flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-2.5">
-            <svg width="22" height="22" viewBox="0 0 28 28" fill="none" className="text-slate-800">
+            <svg width="22" height="22" viewBox="0 0 28 28" fill="none" className="text-[#F5A623]">
               <circle cx="14" cy="14" r="12" stroke="currentColor" strokeWidth="2" />
               <ellipse cx="14" cy="14" rx="5.5" ry="12" stroke="currentColor" strokeWidth="2" />
               <line x1="2" y1="14" x2="26" y2="14" stroke="currentColor" strokeWidth="2" />
@@ -1198,9 +1398,12 @@ export default function LandingPage() {
             ))}
           </div>
 
-          <p className="text-[10px] text-slate-400 font-mono">
-            FastAPI · LangGraph · AviationStack · Tavily · Render.com
-          </p>
+          <div className="w-56 marquee-container text-[10px] text-slate-500 font-mono select-none">
+            <div className="marquee-content">
+              <span>FastAPI · LangGraph · AviationStack · Tavily · Render.com ·&nbsp;</span>
+              <span>FastAPI · LangGraph · AviationStack · Tavily · Render.com ·&nbsp;</span>
+            </div>
+          </div>
         </div>
 
         <div className="border-t border-slate-800 mt-8 pt-4 text-center">

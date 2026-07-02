@@ -16,7 +16,9 @@ import {
   Map,
   CloudSun,
   Layers,
-  Info
+  Info,
+  X,
+  Lock
 } from 'lucide-react';
 import { marked } from 'marked';
 import confetti from 'canvas-confetti';
@@ -67,6 +69,21 @@ export default function Dashboard() {
   const navigate = useNavigate();
 
   const [query, setQuery] = useState("");
+  const [token, setToken] = useState(localStorage.getItem("tripmate_token"));
+
+  // Keep token in sync reactively
+  useEffect(() => {
+    const handleStorageChange = () => {
+      setToken(localStorage.getItem("tripmate_token"));
+    };
+    window.addEventListener("storage", handleStorageChange);
+    window.addEventListener("focus", handleStorageChange);
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
+      window.removeEventListener("focus", handleStorageChange);
+    };
+  }, []);
+
   const [travelContext, setTravelContext] = useState(null);
   const [loading, setLoading] = useState(false);
   const [currentAgentStep, setCurrentAgentStep] = useState(0); 
@@ -84,6 +101,17 @@ export default function Dashboard() {
   const [selectedThreadId, setSelectedThreadId] = useState(null);
   const [saveStatus, setSaveStatus] = useState("unsaved"); // unsaved, saving, saved, error
   const [saveMessage, setSaveMessage] = useState(null);
+  
+  // Quota pop-in modal state
+  const [showQuotaModal, setShowQuotaModal] = useState(
+    localStorage.getItem("tripmate_seen_quota_popup") === null
+  );
+
+  const handleCloseQuotaModal = () => {
+    localStorage.setItem("tripmate_seen_quota_popup", "true");
+    setShowQuotaModal(false);
+  };
+
   const pdfRef = useRef(null);
   const isStreamFinished = useRef(false);
 
@@ -98,21 +126,49 @@ export default function Dashboard() {
     }
   }, [locationState]);
 
-  // Load history
+  // Load history from DB (if authenticated) or local guest storage
   useEffect(() => {
-    const saved = localStorage.getItem("tripmate_history_v2");
-    if (saved) {
-      try {
-        setHistory(JSON.parse(saved));
-      } catch (e) {
-        console.error("Failed to parse history", e);
+    if (token) {
+      const fetchHistoryFromDB = async () => {
+        try {
+          const res = await fetch("/api/trips", {
+            headers: { "Authorization": `Bearer ${token}` }
+          });
+          const data = await res.json();
+          if (res.ok && data.success) {
+            const dbHistory = (data.trips || []).map(t => ({
+              thread_id: t.id,
+              query: t.query,
+              timestamp: new Date(t.created_at).toLocaleDateString(),
+              result: null,
+              travelContext: { destination: t.destination }
+            }));
+            setHistory(dbHistory);
+          }
+        } catch (err) {
+          console.error("Failed to load history from DB", err);
+        }
+      };
+      fetchHistoryFromDB();
+    } else {
+      const saved = localStorage.getItem("tripmate_history_guest");
+      if (saved) {
+        try {
+          setHistory(JSON.parse(saved));
+        } catch (e) {
+          console.error("Failed to parse history", e);
+        }
+      } else {
+        setHistory([]);
       }
     }
-  }, []);
+  }, [token]);
 
   const saveHistory = (newHistory) => {
     setHistory(newHistory);
-    localStorage.setItem("tripmate_history_v2", JSON.stringify(newHistory));
+    if (!token) {
+      localStorage.setItem("tripmate_history_guest", JSON.stringify(newHistory));
+    }
   };
 
   const handleSubmit = async (textToSend) => {
@@ -224,15 +280,40 @@ export default function Dashboard() {
     }
   };
 
-  const handleSelectHistory = (item) => {
+  const handleSelectHistory = async (item) => {
     setSelectedThreadId(item.thread_id);
-    setResult(item.result);
     setQuery(item.query);
     setTravelContext(item.travelContext || null);
     setError(null);
     setActiveTab("overview");
     setSaveStatus("unsaved");
     setSaveMessage(null);
+
+    if (item.result) {
+      setResult(item.result);
+    } else {
+      setLoading(true);
+      try {
+        const token = localStorage.getItem("tripmate_token");
+        const headers = {};
+        if (token) headers["Authorization"] = `Bearer ${token}`;
+
+        const res = await fetch(`/api/trips/${item.thread_id}`, { headers });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          setResult(data.trip.result_json);
+          setHistory(prev => prev.map(h => 
+            h.thread_id === item.thread_id ? { ...h, result: data.trip.result_json } : h
+          ));
+        } else {
+          throw new Error(data.detail || "Failed to load plan details.");
+        }
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
   };
 
   const handleNewPlan = () => {
@@ -243,16 +324,29 @@ export default function Dashboard() {
     setError(null);
     setSaveStatus("unsaved");
     setSaveMessage(null);
-    // Clear route state parameters
     window.history.replaceState({}, document.title);
   };
 
-  const handleDeleteHistory = (e, threadId) => {
+  const handleDeleteHistory = async (e, threadId) => {
     e.stopPropagation();
+    
     const updated = history.filter(h => h.thread_id !== threadId);
     saveHistory(updated);
     if (selectedThreadId === threadId) {
       handleNewPlan();
+    }
+
+    // Delete from backend DB if active user session is present
+    const token = localStorage.getItem("tripmate_token");
+    if (token) {
+      try {
+        await fetch(`/api/trips/${threadId}`, {
+          method: "DELETE",
+          headers: { "Authorization": `Bearer ${token}` }
+        });
+      } catch (err) {
+        console.error("Failed to delete trip from DB", err);
+      }
     }
   };
 
@@ -515,8 +609,8 @@ export default function Dashboard() {
                       className="w-full custom-textarea min-h-[100px] focus:border-[#F5A623]"
                     />
                     <div className="flex justify-between items-center mt-2">
-                      <span className="text-[10px] text-slate-500 font-mono">
-                        Supports natural query parameters
+                      <span className="text-[9px] text-[#F5A623] font-mono flex items-center gap-1 select-none">
+                        <span>ℹ️ Limit: {localStorage.getItem("tripmate_token") ? "2 plans daily" : "1 free plan total"}</span>
                       </span>
                       <button
                         onClick={() => handleSubmit()}
@@ -818,6 +912,97 @@ export default function Dashboard() {
           Built with FastAPI, LangGraph Orchestrator, Groq LLM, PostgreSQL Persisted Checkpointer, wttr.in & Nominatim
         </footer>
       </main>
+
+      {/* Quota benefits popup modal (shown first time) */}
+      {showQuotaModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          {/* Backdrop blur overlay */}
+          <div 
+            className="absolute inset-0 bg-slate-950/80 backdrop-blur-md animate-[fadeIn_0.3s_ease-out]" 
+            onClick={handleCloseQuotaModal}
+          />
+          
+          {/* Pop-in Modal Card */}
+          <div className="relative w-full max-w-2xl bg-[#0D1B2A] border border-slate-800 shadow-2xl rounded-3xl overflow-hidden grid grid-cols-1 md:grid-cols-12 items-stretch z-10 animate-fade-in-up">
+            
+            {/* Left Column: Cover Image */}
+            <div className="md:col-span-5 relative min-h-[160px] md:min-h-full flex flex-col justify-end p-6">
+              <img 
+                src="/auth-bg-2.jpg" 
+                alt="Scenic rainy flowers" 
+                className="absolute inset-0 w-full h-full object-cover animate-slow-zoom-pan" 
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#0D1B2A] via-[#0D1B2A]/40 to-transparent" />
+              <div className="absolute inset-0 bg-[#E8650A]/10 mix-blend-color" />
+              
+              <div className="relative z-10 space-y-1">
+                <span className="text-[8px] font-bold tracking-[0.25em] text-[#F5A623] uppercase font-mono block">TripMate Quotas</span>
+                <h4 className="text-sm font-bold text-white uppercase font-sans" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+                  Your Travel Dashboard
+                </h4>
+              </div>
+            </div>
+
+            {/* Right Column: Quota Details */}
+            <div className="md:col-span-7 p-6 md:p-8 flex flex-col justify-between space-y-6">
+              {/* Close Cross Button */}
+              <button 
+                onClick={handleCloseQuotaModal}
+                className="absolute top-4 right-4 text-slate-500 hover:text-white transition-colors cursor-pointer bg-transparent border-none outline-none"
+              >
+                <X size={18} />
+              </button>
+
+              <div className="space-y-4">
+                <div className="space-y-1">
+                  <span className="text-[9px] font-bold tracking-widest text-[#F5A623] uppercase font-mono block">Plan Limit Policy</span>
+                  <h3 className="text-xl font-extrabold text-white tracking-tight uppercase animate-pulse" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+                    Upgrade Your Limit
+                  </h3>
+                </div>
+
+                <div className="space-y-3 font-mono text-[11px] text-slate-300 leading-relaxed">
+                  <div className="flex items-start gap-2.5 p-3 rounded-xl bg-slate-950/40 border border-slate-900">
+                    <span className="text-red-400 text-sm mt-0.5">🔒</span>
+                    <div>
+                      <p className="font-bold text-slate-200 uppercase tracking-wider">Guest Account</p>
+                      <p className="mt-0.5 text-slate-400">Limited to <span className="text-red-400 font-bold">1 free travel plan</span> total.</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-2.5 p-3 rounded-xl bg-[#F5A623]/5 border border-[#F5A623]/20">
+                    <span className="text-emerald-400 text-sm mt-0.5">🚀</span>
+                    <div>
+                      <p className="font-bold text-slate-200 uppercase tracking-wider">Free Registered Account</p>
+                      <p className="mt-0.5 text-slate-400">Unlock <span className="text-[#F5A623] font-bold">2 plans daily</span> completely free, with full syncing & sharing features.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                <button
+                  onClick={() => {
+                    handleCloseQuotaModal();
+                    navigate('/my-trips');
+                  }}
+                  className="flex-1 py-3 rounded-xl bg-[#E8650A] hover:bg-[#E8650A]/90 hover:shadow-[0_0_15px_rgba(232,101,10,0.3)] text-white text-xs font-bold uppercase tracking-widest transition-all cursor-pointer text-center"
+                >
+                  Create Account
+                </button>
+                <button
+                  onClick={handleCloseQuotaModal}
+                  className="flex-1 py-3 rounded-xl border border-slate-800 bg-slate-950/40 hover:bg-slate-950 text-slate-400 hover:text-white text-xs font-bold uppercase tracking-widest transition-all cursor-pointer text-center"
+                >
+                  Continue as Guest
+                </button>
+              </div>
+
+            </div>
+
+          </div>
+        </div>
+      )}
     </div>
   );
 }

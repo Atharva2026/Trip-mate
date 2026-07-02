@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth, useUser, useSignIn } from '@clerk/clerk-react';
 import { 
   Compass, 
   Trash2, 
@@ -11,23 +12,103 @@ import {
   ArrowLeft,
   Lock,
   Unlock,
-  Plus
+  Plus,
+  Mail,
+  Eye,
+  EyeOff,
+  ShieldCheck
 } from 'lucide-react';
 
 export default function MyTrips() {
   const navigate = useNavigate();
-  const [token, setToken] = useState(localStorage.getItem("tripmate_token"));
-  
-  // Auth state
-  const [isRegister, setIsRegister] = useState(false);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const { isSignedIn, userId, getToken, signOut } = useAuth();
+  const { user } = useUser();
+  const { signIn } = useSignIn();
+
+  const [token, setToken] = useState(null);
+  const [userEmail, setUserEmail] = useState(null);
+
+  // Sync Clerk session with local states and local storage for planner quotas
+  useEffect(() => {
+    const syncClerkSession = async () => {
+      if (isSignedIn) {
+        try {
+          const clerkToken = await getToken();
+          setToken(clerkToken);
+          const email = user?.primaryEmailAddress?.emailAddress || null;
+          setUserEmail(email);
+          
+          localStorage.setItem("tripmate_token", clerkToken);
+          localStorage.setItem("tripmate_user", JSON.stringify({
+            email: email,
+            name: user?.fullName || "Wanderer"
+          }));
+        } catch (e) {
+          console.error("Error syncing Clerk session token", e);
+        }
+      } else {
+        setToken(null);
+        setUserEmail(null);
+        localStorage.removeItem("tripmate_token");
+        localStorage.removeItem("tripmate_user");
+      }
+    };
+    syncClerkSession();
+  }, [isSignedIn, user, getToken]);
+
+  const handleGoogleSignIn = () => {
+    if (!signIn) return;
+    try {
+      signIn.authenticateWithRedirect({
+        strategy: "oauth_google",
+        redirectUrl: window.location.origin + "/my-trips",
+        redirectUrlComplete: window.location.origin + "/my-trips"
+      });
+    } catch (err) {
+      setAuthError(err.message || "Failed to initiate Clerk Google login");
+    }
+  };
+
   const [authError, setAuthError] = useState(null);
   
   // Trips state
   const [trips, setTrips] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  // Custom modal states
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [tripToDelete, setTripToDelete] = useState(null);
+
+  // Magnetic button custom cursor effect hook
+  const useMagneticButton = () => {
+    const ref = useRef(null);
+    useEffect(() => {
+      const elem = ref.current;
+      if (!elem) return;
+      const handleMouseMove = (e) => {
+        const { clientX, clientY } = e;
+        const { left, top, width, height } = elem.getBoundingClientRect();
+        const x = clientX - (left + width / 2);
+        const y = clientY - (top + height / 2);
+        elem.style.transform = `translate3d(${x * 0.28}px, ${y * 0.28}px, 0)`;
+      };
+      const handleMouseLeave = () => {
+        elem.style.transform = 'translate3d(0, 0, 0)';
+      };
+      elem.addEventListener('mousemove', handleMouseMove);
+      elem.addEventListener('mouseleave', handleMouseLeave);
+      return () => {
+        elem.removeEventListener('mousemove', handleMouseMove);
+        elem.removeEventListener('mouseleave', handleMouseLeave);
+      };
+    }, []);
+    return ref;
+  };
+
+
+
+
 
   // Load trips when authenticated
   useEffect(() => {
@@ -41,7 +122,10 @@ export default function MyTrips() {
     setError(null);
     try {
       const response = await fetch('/api/trips', {
-        headers: { "Authorization": `Bearer ${token}` }
+        headers: { 
+          "Authorization": `Bearer ${token}`,
+          "X-User-Email": userEmail
+        }
       });
       const data = await response.json();
       
@@ -61,59 +145,30 @@ export default function MyTrips() {
     }
   };
 
-  const handleAuth = async (e) => {
-    e.preventDefault();
-    setAuthError(null);
-    
-    const endpoint = isRegister ? '/api/auth/register' : '/api/auth/login';
-    try {
-      const response = await fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password })
-      });
-      const data = await response.json();
-      
-      if (!response.ok || !data.success) {
-        throw new Error(data.detail || data.error || "Authentication failed.");
-      }
-      
-      localStorage.setItem("tripmate_token", data.token);
-      localStorage.setItem("tripmate_user", JSON.stringify(data.user));
-      setToken(data.token);
-      
-      // Clear inputs
-      setEmail("");
-      setPassword("");
-    } catch (err) {
-      setAuthError(err.message);
-    }
-  };
+
 
   const handleLogout = () => {
-    localStorage.removeItem("tripmate_token");
-    localStorage.removeItem("tripmate_user");
-    setToken(null);
+    signOut();
     setTrips([]);
   };
 
-  const handleDelete = async (tripId) => {
-    if (!confirm("Are you sure you want to delete this travel plan?")) return;
-    
+  const executeDelete = async (tripId) => {
     try {
       const response = await fetch(`/api/trips/${tripId}`, {
         method: "DELETE",
-        headers: { "Authorization": `Bearer ${token}` }
+        headers: { 
+          "Authorization": `Bearer ${token}`,
+          "X-User-Email": userEmail
+        }
       });
       
       if (!response.ok) {
         throw new Error("Failed to delete trip plan.");
       }
       
-      // Remove locally
       setTrips(trips.filter(t => t.id !== tripId));
     } catch (err) {
-      alert(err.message);
+      setError(err.message);
     }
   };
 
@@ -123,7 +178,8 @@ export default function MyTrips() {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
+          "Authorization": `Bearer ${token}`,
+          "X-User-Email": userEmail
         },
         body: JSON.stringify({ is_public: !currentStatus })
       });
@@ -148,11 +204,20 @@ export default function MyTrips() {
 
   return (
     <div className="relative min-h-screen bg-[#0D1B2A] text-slate-200 font-sans pb-12 flex flex-col">
-      {/* Background glow animations */}
-      <div className="background-glows">
-        <div className="glow-1"></div>
-        <div className="glow-2"></div>
-        <div className="glow-3"></div>
+      {/* Ambient background glows */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
+        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] rounded-full bg-[#F5A623]/5 blur-[120px] animate-float-a" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[60%] h-[60%] rounded-full bg-sky-500/5 blur-[150px] animate-float-b" />
+      </div>
+
+      {/* Global textured noise overlay */}
+      <div className="fixed inset-0 pointer-events-none z-50 opacity-[0.03] mix-blend-overlay">
+        <svg className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
+          <filter id="noiseFilter">
+            <feTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" stitchTiles="stitch" />
+          </filter>
+          <rect width="100%" height="100%" filter="url(#noiseFilter)" />
+        </svg>
       </div>
 
       {/* Navigation Header */}
@@ -173,9 +238,9 @@ export default function MyTrips() {
             >
               Go to Planner
             </button>
-            {token && (
+            {isSignedIn && (
               <button 
-                onClick={handleLogout}
+                onClick={() => setShowLogoutConfirm(true)}
                 className="px-4 py-2 text-xs font-semibold text-slate-400 hover:text-white transition-colors cursor-pointer bg-transparent border-none"
               >
                 Log Out
@@ -188,100 +253,84 @@ export default function MyTrips() {
       {/* Content Area */}
       <div className="flex-1 max-w-5xl w-full mx-auto px-6 pt-8 space-y-6">
         
-        {/* If NOT Authenticated: Show Auth Gateway Wall */}
-        {!token ? (
-          <div className="max-w-4xl mx-auto pt-4 grid grid-cols-1 md:grid-cols-12 gap-8 items-stretch">
-            
-            {/* Left Aesthetic Panel with Camper Van Nature Image */}
-            <div className="md:col-span-5 relative rounded-2xl overflow-hidden min-h-[260px] md:min-h-full border border-[#F5A623]/25 shadow-xl bg-slate-900 flex flex-col justify-end p-8 group">
-              <img 
-                src="/no-internet-nature.jpg" 
-                alt="Throw your phone away and find a spot in nature" 
-                className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" 
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-[#0D1B2A] via-[#0D1B2A]/40 to-transparent z-[1]" />
-              <div className="absolute inset-0 bg-[#E8650A]/10 mix-blend-color z-[1]" />
-              
-              <div className="relative z-10 space-y-2">
-                <span className="text-[10px] font-bold tracking-[0.25em] text-[#F5A623] uppercase font-mono block">Offline Wanderlust</span>
-                <h3 className="text-lg font-bold text-white uppercase leading-tight" style={{ fontFamily: "'Playfair Display', serif" }}>
-                  Find Your Sanctuary
-                </h3>
-                <p className="text-[10px] text-slate-350 leading-relaxed">
-                  Disconnect to reconnect. Keep all your nature and travel schedules stored safely under one account.
-                </p>
-              </div>
+        {!isSignedIn ? (
+          <div className="max-w-4xl mx-auto pt-4 space-y-8 animate-fade-in relative z-10">
+            {/* Unified Page Header */}
+            <div className="text-center space-y-2">
+              <span className="text-[10px] font-bold tracking-[0.25em] text-[#F5A623] uppercase font-mono block">Your Trips, Everywhere</span>
+              <h2 className="text-3xl font-extrabold text-white tracking-tight uppercase" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+                Never Lose a Plan Again
+              </h2>
+              <p className="text-xs text-slate-400 font-mono max-w-lg mx-auto">
+                Every itinerary, saved the moment it's generated — pick up on any device.
+              </p>
             </div>
 
-            {/* Right Auth Form */}
-            <div className="md:col-span-7 flex flex-col justify-center">
-              <div className="space-y-6">
-                <div className="text-left space-y-2">
-                  <h2 className="text-2xl font-bold text-white uppercase tracking-tight font-mono">Save & Sync Your Trips</h2>
-                  <p className="text-xs text-slate-400 font-mono">
-                    Create a secure account to save itineraries, configure visibility options, and share links.
+            {/* Symmetrical Columns Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-stretch">
+              
+              {/* Left Aesthetic Panel with dynamic matching travel illustration */}
+              <div className="md:col-span-5 relative rounded-2xl overflow-hidden min-h-[320px] md:min-h-full border border-slate-800 shadow-xl bg-slate-950 flex flex-col justify-end p-8 group">
+                <img 
+                  src="/auth-safe-travel.png" 
+                  alt="Your Travel Journal and Passport Kept Securely" 
+                  className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" 
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#0D1B2A] via-[#0D1B2A]/40 to-transparent z-[1]" />
+                <div className="absolute inset-0 bg-[#E8650A]/10 mix-blend-color z-[1]" />
+                
+                <div className="relative z-10 space-y-2">
+                  <span className="text-[9px] font-bold tracking-[0.25em] text-[#F5A623] uppercase font-mono block">
+                    Globe Express Vault
+                  </span>
+                  <h3 className="text-lg font-bold text-white uppercase leading-tight" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+                    Your Travel life, kept safe
+                  </h3>
+                  <p className="text-[10px] text-slate-300 leading-relaxed font-mono">
+                    Keep your custom nature routes, flight itineraries, and accommodation schedules stored safely under one account.
                   </p>
                 </div>
+              </div>
 
+              {/* Right Auth Form */}
+              <div className="md:col-span-7 flex flex-col justify-center">
                 {/* Auth Form Card */}
-                <div className="p-6 md:p-8 glass-panel border border-[#F5A623]/20 bg-slate-900/60 shadow-2xl rounded-2xl">
-                  <form onSubmit={handleAuth} className="space-y-4">
-                    {authError && (
-                      <div className="p-3 rounded-lg border border-red-500/20 bg-red-950/20 text-xs text-red-400 font-mono">
-                        {authError}
-                      </div>
-                    )}
+                <div className="p-6 md:p-8 border border-slate-850 bg-slate-900/60 backdrop-blur-md shadow-2xl rounded-2xl space-y-6">
+                  {authError && (
+                    <div className="p-3 rounded-lg border border-red-500/20 bg-red-950/20 text-xs text-red-400 font-mono animate-pulse">
+                      {authError}
+                    </div>
+                  )}
+
+                  {/* Clerk Google Sign In Container */}
+                  <div className="space-y-4 text-center">
+                    <h3 className="text-sm font-bold text-white uppercase tracking-wider font-mono">Sign In to Your Account</h3>
+                    <p className="text-xs text-slate-400 font-mono">
+                      Authorize via Clerk to instantly sync plans across all your devices.
+                    </p>
                     
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold uppercase text-slate-400 tracking-wider font-mono">Email Address</label>
-                      <input
-                        type="email"
-                        required
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder="you@example.com"
-                        className="w-full custom-textarea min-h-[48px] focus:border-[#F5A623]"
-                        style={{ resize: 'none', height: '48px', padding: '12px 16px' }}
-                      />
+                    <div className="pt-2">
+                      <button
+                        onClick={handleGoogleSignIn}
+                        className="w-full py-4 rounded-xl text-white font-bold text-xs tracking-widest uppercase transition-all shadow-lg flex items-center justify-center gap-3 cursor-pointer bg-[#E8650A] hover:bg-[#E8650A]/90 hover:shadow-[0_0_20px_rgba(232,101,10,0.4)] shimmer-btn"
+                      >
+                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M12.24 10.285V14.4h6.887c-.648 2.41-2.519 4.114-5.136 4.114-3.555 0-6.435-2.884-6.435-6.435s2.88-6.435 6.435-6.435c1.622 0 3.093.593 4.237 1.583l3.072-3.072C19.243 1.937 15.892 1 12 1 5.925 1 1 5.925 1 12s4.925 11 11 11c6.262 0 11-4.738 11-11 0-.756-.086-1.487-.245-2.285H12.24z" fill="currentColor" />
+                        </svg>
+                        <span>Continue with Google</span>
+                      </button>
                     </div>
+                  </div>
 
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold uppercase text-slate-400 tracking-wider font-mono">Password</label>
-                      <input
-                        type="password"
-                        required
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        placeholder="••••••••"
-                        className="w-full custom-textarea min-h-[48px] focus:border-[#F5A623]"
-                        style={{ resize: 'none', height: '48px', padding: '12px 16px' }}
-                      />
-                    </div>
-
-                    <button
-                      type="submit"
-                      className="w-full custom-btn py-3 font-semibold text-xs mt-2 text-white cursor-pointer"
-                    >
-                      {isRegister ? 'Create Account' : 'Sign In'}
-                    </button>
-                  </form>
-
-                  {/* Toggle registering */}
-                  <div className="text-center mt-4">
-                    <button
-                      onClick={() => {
-                        setIsRegister(!isRegister);
-                        setAuthError(null);
-                      }}
-                      className="text-xs text-[#F5A623] hover:text-[#d38b19] font-bold transition-colors cursor-pointer bg-transparent border-none"
-                    >
-                      {isRegister ? 'Already have an account? Sign In' : "Don't have an account? Sign Up"}
-                    </button>
+                  {/* Trust Signal Badge */}
+                  <div className="flex items-center justify-center gap-1.5 text-[9px] font-mono text-slate-500 select-none">
+                    <ShieldCheck size={11} className="text-emerald-400" />
+                    <span>Secured by Clerk Identity</span>
                   </div>
                 </div>
               </div>
-            </div>
 
+            </div>
           </div>
         ) : (
           /* Authenticated Dashboard View */
@@ -417,7 +466,7 @@ export default function MyTrips() {
                             <ExternalLink className="w-4 h-4" />
                           </button>
                           <button
-                            onClick={() => handleDelete(trip.id)}
+                            onClick={() => setTripToDelete(trip.id)}
                             className="p-1.5 rounded-lg hover:bg-red-950/20 text-slate-400 hover:text-red-400 transition-all duration-150 cursor-pointer"
                             title="Delete plan"
                           >
@@ -459,6 +508,85 @@ export default function MyTrips() {
         )}
 
       </div>
+
+      {/* Premium Custom Logout Confirmation Modal */}
+      {showLogoutConfirm && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div 
+            className="absolute inset-0 bg-slate-950/85 backdrop-blur-md animate-[fadeIn_0.2s_ease-out]" 
+            onClick={() => setShowLogoutConfirm(false)}
+          />
+          <div className="relative w-full max-w-sm bg-[#0D1B2A] border border-slate-800 p-6 rounded-2xl shadow-2xl z-10 animate-fade-in-up space-y-5">
+            <div className="text-center space-y-2">
+              <div className="w-12 h-12 rounded-full bg-[#E8650A]/10 text-[#E8650A] flex items-center justify-center mx-auto border border-[#E8650A]/20">
+                <Lock size={20} className="animate-pulse" />
+              </div>
+              <h3 className="text-lg font-bold text-white uppercase tracking-tight font-mono">Confirm Logout</h3>
+              <p className="text-xs text-slate-400 font-mono">
+                Are you sure you want to log out of your Globe Express account?
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowLogoutConfirm(false);
+                  handleLogout();
+                }}
+                className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold uppercase tracking-widest transition-all cursor-pointer text-center font-mono"
+              >
+                Log Out
+              </button>
+              <button
+                onClick={() => setShowLogoutConfirm(false)}
+                className="flex-1 py-2.5 rounded-xl border border-slate-800 bg-slate-950/40 hover:bg-slate-950 text-slate-400 hover:text-white text-xs font-bold uppercase tracking-widest transition-all cursor-pointer text-center font-mono"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Premium Custom Delete Confirmation Modal */}
+      {tripToDelete && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div 
+            className="absolute inset-0 bg-slate-950/85 backdrop-blur-md animate-[fadeIn_0.2s_ease-out]" 
+            onClick={() => setTripToDelete(null)}
+          />
+          <div className="relative w-full max-w-sm bg-[#0D1B2A] border border-slate-800 p-6 rounded-2xl shadow-2xl z-10 animate-fade-in-up space-y-5">
+            <div className="text-center space-y-2">
+              <div className="w-12 h-12 rounded-full bg-red-950/30 text-red-500 flex items-center justify-center mx-auto border border-red-500/20">
+                <Trash2 size={20} className="animate-bounce" />
+              </div>
+              <h3 className="text-lg font-bold text-white uppercase tracking-tight font-mono">Delete Travel Plan</h3>
+              <p className="text-xs text-slate-400 font-mono">
+                Are you sure you want to permanently delete this travel plan? This action cannot be undone.
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={async () => {
+                  const id = tripToDelete;
+                  setTripToDelete(null);
+                  await executeDelete(id);
+                }}
+                className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold uppercase tracking-widest transition-all cursor-pointer text-center font-mono"
+              >
+                Delete
+              </button>
+              <button
+                onClick={() => setTripToDelete(null)}
+                className="flex-1 py-2.5 rounded-xl border border-slate-800 bg-slate-950/40 hover:bg-slate-950 text-slate-400 hover:text-white text-xs font-bold uppercase tracking-widest transition-all cursor-pointer text-center font-mono"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+
     </div>
   );
 }

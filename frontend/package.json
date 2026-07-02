@@ -10,6 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@clerk/clerk-react": "^5.61.8",
     "canvas-confetti": "^1.9.4",
     "lucide-react": "^1.22.0",
     "marked": "^18.0.5",
