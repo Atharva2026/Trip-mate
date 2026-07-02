@@ -182,6 +182,10 @@ def check_rate_limit(client_ip: str, user_id: str | None = None) -> None:
     Raises:
         RateLimitExceeded: If the rate limit is exceeded
     """
+    # Bypass rate limits for local development loopback connections
+    if client_ip in ("127.0.0.1", "::1", "localhost"):
+        return
+
     if user_id:
         _limiter.check(key=user_id, tier="authenticated")
     else:

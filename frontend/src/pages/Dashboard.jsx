@@ -188,10 +188,16 @@ export default function Dashboard() {
     setSelectedThreadId(threadIdToSend);
 
     try {
+      const headers = { "Content-Type": "application/json" };
+      const localToken = localStorage.getItem("tripmate_token");
+      if (localToken) {
+        headers["Authorization"] = `Bearer ${localToken}`;
+      }
+
       // POST with stream=true to start background orchestration
       const response = await fetch("/api/travel", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({
           message: messageText,
           thread_id: threadIdToSend,
@@ -266,12 +272,16 @@ export default function Dashboard() {
         }
       };
 
+      let sseErrorCount = 0;
       eventSource.onerror = (err) => {
         if (isStreamFinished.current) return;
-        console.error("SSE stream error:", err);
-        setError("Streaming pipeline disconnected. Please try again.");
-        setLoading(false);
-        eventSource.close();
+        console.warn("SSE stream connection issue, retrying...", err);
+        sseErrorCount++;
+        if (sseErrorCount > 5) {
+          setError("Streaming pipeline disconnected. Please try again.");
+          setLoading(false);
+          eventSource.close();
+        }
       };
 
     } catch (err) {

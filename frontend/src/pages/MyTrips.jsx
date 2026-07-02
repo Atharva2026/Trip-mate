@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth, useUser, useSignIn } from '@clerk/clerk-react';
 import { 
   Compass, 
   Trash2, 
@@ -21,53 +20,15 @@ import {
 
 export default function MyTrips() {
   const navigate = useNavigate();
-  const { isSignedIn, userId, getToken, signOut } = useAuth();
-  const { user } = useUser();
-  const { signIn } = useSignIn();
-
-  const [token, setToken] = useState(null);
-  const [userEmail, setUserEmail] = useState(null);
-
-  // Sync Clerk session with local states and local storage for planner quotas
-  useEffect(() => {
-    const syncClerkSession = async () => {
-      if (isSignedIn) {
-        try {
-          const clerkToken = await getToken();
-          setToken(clerkToken);
-          const email = user?.primaryEmailAddress?.emailAddress || null;
-          setUserEmail(email);
-          
-          localStorage.setItem("tripmate_token", clerkToken);
-          localStorage.setItem("tripmate_user", JSON.stringify({
-            email: email,
-            name: user?.fullName || "Wanderer"
-          }));
-        } catch (e) {
-          console.error("Error syncing Clerk session token", e);
-        }
-      } else {
-        setToken(null);
-        setUserEmail(null);
-        localStorage.removeItem("tripmate_token");
-        localStorage.removeItem("tripmate_user");
-      }
-    };
-    syncClerkSession();
-  }, [isSignedIn, user, getToken]);
-
-  const handleGoogleSignIn = () => {
-    if (!signIn) return;
+  const [token, setToken] = useState(localStorage.getItem("tripmate_token"));
+  const [userEmail, setUserEmail] = useState(() => {
     try {
-      signIn.authenticateWithRedirect({
-        strategy: "oauth_google",
-        redirectUrl: window.location.origin + "/my-trips",
-        redirectUrlComplete: window.location.origin + "/my-trips"
-      });
-    } catch (err) {
-      setAuthError(err.message || "Failed to initiate Clerk Google login");
+      const u = JSON.parse(localStorage.getItem("tripmate_user") || "null");
+      return u ? u.email : null;
+    } catch (e) {
+      return null;
     }
-  };
+  });
 
   const [authError, setAuthError] = useState(null);
   
@@ -80,8 +41,51 @@ export default function MyTrips() {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [tripToDelete, setTripToDelete] = useState(null);
 
+  const [isRegister, setIsRegister] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+
+  const submitBtnRef = useMagneticButton();
+
+  const getPasswordStrength = (pwd) => {
+    if (!pwd) return 0;
+    let score = 0;
+    if (pwd.length >= 6) score += 1;
+    if (pwd.length >= 10) score += 1;
+    if (/[A-Z]/.test(pwd)) score += 1;
+    if (/[0-9]/.test(pwd)) score += 1;
+    if (/[^A-Za-z0-9]/.test(pwd)) score += 1;
+    return score;
+  };
+
+  const handleAuth = async (e) => {
+    e.preventDefault();
+    setAuthError(null);
+    const endpoint = isRegister ? '/api/auth/register' : '/api/auth/login';
+    try {
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password })
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.detail || data.error || "Authentication failed.");
+      }
+      localStorage.setItem("tripmate_token", data.token);
+      localStorage.setItem("tripmate_user", JSON.stringify(data.user));
+      setToken(data.token);
+      setUserEmail(data.user.email);
+      setEmail("");
+      setPassword("");
+    } catch (err) {
+      setAuthError(err.message);
+    }
+  };
+
   // Magnetic button custom cursor effect hook
-  const useMagneticButton = () => {
+  function useMagneticButton() {
     const ref = useRef(null);
     useEffect(() => {
       const elem = ref.current;
@@ -148,7 +152,9 @@ export default function MyTrips() {
 
 
   const handleLogout = () => {
-    signOut();
+    localStorage.removeItem("tripmate_token");
+    localStorage.removeItem("tripmate_user");
+    setToken(null);
     setTrips([]);
   };
 
@@ -238,7 +244,7 @@ export default function MyTrips() {
             >
               Go to Planner
             </button>
-            {isSignedIn && (
+            {token && (
               <button 
                 onClick={() => setShowLogoutConfirm(true)}
                 className="px-4 py-2 text-xs font-semibold text-slate-400 hover:text-white transition-colors cursor-pointer bg-transparent border-none"
@@ -253,7 +259,7 @@ export default function MyTrips() {
       {/* Content Area */}
       <div className="flex-1 max-w-5xl w-full mx-auto px-6 pt-8 space-y-6">
         
-        {!isSignedIn ? (
+        {!token ? (
           <div className="max-w-4xl mx-auto pt-4 space-y-8 animate-fade-in relative z-10">
             {/* Unified Page Header */}
             <div className="text-center space-y-2">
@@ -296,36 +302,121 @@ export default function MyTrips() {
               <div className="md:col-span-7 flex flex-col justify-center">
                 {/* Auth Form Card */}
                 <div className="p-6 md:p-8 border border-slate-850 bg-slate-900/60 backdrop-blur-md shadow-2xl rounded-2xl space-y-6">
-                  {authError && (
-                    <div className="p-3 rounded-lg border border-red-500/20 bg-red-950/20 text-xs text-red-400 font-mono animate-pulse">
-                      {authError}
-                    </div>
-                  )}
-
-                  {/* Clerk Google Sign In Container */}
-                  <div className="space-y-4 text-center">
-                    <h3 className="text-sm font-bold text-white uppercase tracking-wider font-mono">Sign In to Your Account</h3>
-                    <p className="text-xs text-slate-400 font-mono">
-                      Authorize via Clerk to instantly sync plans across all your devices.
+                  {/* Title / Toggle */}
+                  <div className="text-center space-y-1">
+                    <h3 className="text-sm font-bold text-white uppercase tracking-wider font-mono">
+                      {isRegister ? "Create Your Account" : "Welcome Back"}
+                    </h3>
+                    <p className="text-[10px] text-slate-400 font-mono">
+                      {isRegister ? "Register to save and sync itineraries" : "Sign in to access your travel journals"}
                     </p>
+                  </div>
+
+                  <form onSubmit={handleAuth} className="space-y-4">
+                    {authError && (
+                      <div className="p-3 rounded-lg border border-red-500/20 bg-red-950/20 text-xs text-red-400 font-mono animate-pulse">
+                        {authError}
+                      </div>
+                    )}
                     
+                    {/* Email Input */}
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold uppercase text-slate-400 tracking-wider font-mono">Email Address</label>
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-500">
+                          <Mail size={15} />
+                        </div>
+                        <input
+                          type="email"
+                          required
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          placeholder="you@example.com"
+                          className="w-full rounded-xl outline-none text-xs md:text-sm p-3.5 pl-11 border border-slate-800 bg-slate-950/70 text-slate-100 transition-all textarea-pulse-focus"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Password Input */}
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold uppercase text-slate-400 tracking-wider font-mono">Password</label>
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-500">
+                          <Lock size={15} />
+                        </div>
+                        <input
+                          type={showPassword ? "text" : "password"}
+                          required
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          placeholder="••••••••"
+                          className="w-full rounded-xl outline-none text-xs md:text-sm p-3.5 pl-11 pr-12 border border-slate-800 bg-slate-950/70 text-slate-100 transition-all textarea-pulse-focus"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-500 hover:text-white cursor-pointer transition-colors bg-transparent border-none"
+                        >
+                          {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                        </button>
+                      </div>
+
+                      {/* Password strength details */}
+                      {isRegister && password && (
+                        <div className="space-y-1 mt-2">
+                          <div className="flex gap-1 h-1">
+                            {[1, 2, 3, 4, 5].map((level) => {
+                              const strength = getPasswordStrength(password);
+                              let bgColor = "bg-slate-800";
+                              if (level <= strength) {
+                                if (strength <= 2) bgColor = "bg-red-500";
+                                else if (strength <= 4) bgColor = "bg-amber-500";
+                                else bgColor = "bg-emerald-500";
+                              }
+                              return <div key={level} className={`flex-1 h-full rounded-full transition-all duration-300 ${bgColor}`} />;
+                            })}
+                          </div>
+                          <p className="text-[9px] text-slate-500 font-mono text-right uppercase tracking-wider">
+                            {(() => {
+                              const strength = getPasswordStrength(password);
+                              if (strength <= 2) return "Weak";
+                              if (strength <= 4) return "Medium Secure";
+                              return "Strong Vault-Level Security";
+                            })()}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
                     <div className="pt-2">
                       <button
-                        onClick={handleGoogleSignIn}
-                        className="w-full py-4 rounded-xl text-white font-bold text-xs tracking-widest uppercase transition-all shadow-lg flex items-center justify-center gap-3 cursor-pointer bg-[#E8650A] hover:bg-[#E8650A]/90 hover:shadow-[0_0_20px_rgba(232,101,10,0.4)] shimmer-btn"
+                        ref={submitBtnRef}
+                        type="submit"
+                        className="w-full py-3.5 rounded-xl text-white font-bold text-xs tracking-widest uppercase transition-all shadow-lg flex items-center justify-center gap-2 group cursor-pointer bg-[#E8650A] hover:bg-[#E8650A]/90 hover:shadow-[0_0_20px_rgba(232,101,10,0.4)] shimmer-btn"
                       >
-                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M12.24 10.285V14.4h6.887c-.648 2.41-2.519 4.114-5.136 4.114-3.555 0-6.435-2.884-6.435-6.435s2.88-6.435 6.435-6.435c1.622 0 3.093.593 4.237 1.583l3.072-3.072C19.243 1.937 15.892 1 12 1 5.925 1 1 5.925 1 12s4.925 11 11 11c6.262 0 11-4.738 11-11 0-.756-.086-1.487-.245-2.285H12.24z" fill="currentColor" />
-                        </svg>
-                        <span>Continue with Google</span>
+                        <span>{isRegister ? 'Create Account' : 'Sign In'}</span>
                       </button>
                     </div>
+                  </form>
+
+
+                  {/* Toggle registration mode */}
+                  <div className="text-center mt-2">
+                    <button
+                      onClick={() => {
+                        setIsRegister(!isRegister);
+                        setAuthError(null);
+                      }}
+                      className="text-xs text-[#F5A623] hover:text-[#d38b19] font-bold hover:underline transition-all cursor-pointer bg-transparent border-none decoration-solid"
+                    >
+                      {isRegister ? 'Already have an account? Sign In' : "Don't have an account? Sign Up"}
+                    </button>
                   </div>
 
                   {/* Trust Signal Badge */}
                   <div className="flex items-center justify-center gap-1.5 text-[9px] font-mono text-slate-500 select-none">
-                    <ShieldCheck size={11} className="text-emerald-400" />
-                    <span>Secured by Clerk Identity</span>
+                    <ShieldCheck size={11} className="text-[#E8650A]" />
+                    <span>Secured by TripMate Vault</span>
                   </div>
                 </div>
               </div>

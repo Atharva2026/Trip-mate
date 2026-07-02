@@ -377,12 +377,12 @@ async def travel_stream(thread_id: str):
             while True:
                 try:
                     # Retrieve next progress event from the queue with a 2.0s timeout
-                    event = await asyncio.wait_for(queue.get(), timeout=2.0)
+                    event = await asyncio.wait_for(queue.get(), timeout=30.0)
                     yield f"data: {json.dumps(event)}\n\n"
                     
                     # Close connection if finalized or error occurs
                     if event.get("done") and (event.get("node") == "final_agent" or event.get("node") == "error"):
-                        await asyncio.sleep(0.5)
+                        await asyncio.sleep(5.0)
                         break
                 except asyncio.TimeoutError:
                     # Send a keep-alive comment to prevent socket/proxy timeouts during long agent tasks

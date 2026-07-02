@@ -54,10 +54,26 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 if not GROQ_API_KEY:
     raise ValueError("GROQ_API_KEY is missing. Please add it to your .env file.")
 
-llm = ChatGroq(
+primary_llm = ChatGroq(
     model="llama-3.3-70b-versatile",
     api_key=GROQ_API_KEY,
 )
+
+fallback_llm = ChatGroq(
+    model="llama-3.1-8b-instant",
+    api_key=GROQ_API_KEY,
+)
+
+llm = primary_llm.with_fallbacks([fallback_llm])
+
+def get_structured_llm(output_schema):
+    """
+    Returns a structured LLM chain with dynamic model fallbacks to support
+    resilience against 429 daily rate limits.
+    """
+    primary_structured = primary_llm.with_structured_output(output_schema)
+    fallback_structured = fallback_llm.with_structured_output(output_schema)
+    return primary_structured.with_fallbacks([fallback_structured])
 
 
 # =========================
@@ -196,7 +212,7 @@ User query: {query}"""
     cache_key = f"intent:{hash(query.lower().strip())}"
     
     async def classify_intent_fn():
-        structured_llm = llm.with_structured_output(IntentClassification)
+        structured_llm = get_structured_llm(IntentClassification)
         res = await structured_llm.ainvoke([
             SystemMessage(content="You are a travel query classifier. Be precise."),
             HumanMessage(content=classification_prompt),
@@ -601,7 +617,7 @@ Check for these specific issues:
 Be strict but fair. Minor style issues are fine — focus on logical and practical errors."""
 
     async def validate_fn():
-        structured_llm = llm.with_structured_output(ValidationResult)
+        structured_llm = get_structured_llm(ValidationResult)
         return await structured_llm.ainvoke([
             SystemMessage(content="You are a strict but fair travel plan auditor."),
             HumanMessage(content=validation_prompt),
@@ -799,7 +815,7 @@ Important:
         HumanMessage(content=final_prompt),
     ])
 
-    progress.append(emit_progress(state, "final_agent", "✨ Your travel plan is ready!", done=True))
+    progress.append(emit_progress(state, "final_agent", "✨ Your travel plan is ready!", done=False))
 
     agents_used = state.get("agents_used", []) + ["final_agent"]
 

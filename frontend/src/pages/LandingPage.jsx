@@ -230,10 +230,107 @@ function useMagneticButton() {
   return ref;
 }
 
+const renderStars = (rating) => {
+  const stars = [];
+  const fullStars = Math.floor(rating);
+  const hasHalf = rating % 1 !== 0;
+  
+  for (let i = 0; i < 5; i++) {
+    if (i < fullStars) {
+      stars.push(
+        <svg key={i} className="w-3 h-3 fill-current text-[#F5A623]" viewBox="0 0 24 24">
+          <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
+        </svg>
+      );
+    } else if (i === fullStars && hasHalf) {
+      stars.push(
+        <svg key={i} className="w-3 h-3 text-[#F5A623]" viewBox="0 0 24 24" fill="currentColor">
+          <defs>
+            <linearGradient id={`halfGrad-${rating}`}>
+              <stop offset="50%" stopColor="#F5A623" />
+              <stop offset="50%" stopColor="#475569" />
+            </linearGradient>
+          </defs>
+          <path fill={`url(#halfGrad-${rating})`} d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
+        </svg>
+      );
+    } else {
+      stars.push(
+        <svg key={i} className="w-3 h-3 text-slate-700 fill-current" viewBox="0 0 24 24">
+          <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
+        </svg>
+      );
+    }
+  }
+  return <div className="flex gap-0.5">{stars}</div>;
+};
+
 const DURATION = 8000;
+
+const CAROUSEL_STORIES = [
+  {
+    id: 0,
+    name: 'Sarah Jenkins',
+    role: 'Solo Backpacker',
+    destination: 'Saint Antönien, Switzerland',
+    desc: "I wanted a safe, off-the-beaten-path route in Switzerland. TripMate's agents drafted a 10-day itinerary in Saint Antönien that was absolutely flawless. The budget allocation was down to the rupee.",
+    summary: "Custom, safe routes designed for solo backpacking in high mountain chalets.",
+    image: '/slide-switzerland.jpg',
+    avatar: '/traveler-alpine-sarah.png',
+    proof: ['10 Days', '₹1.4L Budget', 'Verified Route'],
+    rating: 5.0
+  },
+  {
+    id: 1,
+    name: 'Marcus Chen',
+    role: 'Luxury Couple Travel',
+    destination: 'Merzouga, Morocco',
+    desc: 'We booked our 5-day Marrakech getaway. The hotel recommendations matched our vibe perfectly, and the flight schedules integrated without a single gap. Outstanding execution.',
+    summary: "Flawless flight coordination & candlelit riad selections in the Sahara.",
+    image: '/slide-morocco.jpg',
+    avatar: '/traveler-desert-marcus.png',
+    proof: ['5 Days', '₹95k Budget', 'Verified Route'],
+    rating: 4.5
+  },
+  {
+    id: 2,
+    name: 'Elena Rostova',
+    role: 'Family Explorer',
+    destination: 'Nagano, Japan',
+    desc: 'Planning for a family of 4 is usually a nightmare. TripMate synchronized hotels, routes, and travel break pacing in under 30 seconds. This is the future of travel planning.',
+    summary: "Synchronized travel times, dining breaks, and activities for a family of 4.",
+    image: '/slide-nagano.jpg',
+    avatar: '/traveler-nature-elena.png',
+    proof: ['7 Days', '₹1.8L Budget', 'Verified Route'],
+    rating: 4.5
+  },
+  {
+    id: 3,
+    name: 'Clara & Liam',
+    role: 'Beach Seekers',
+    destination: 'Los Lances, Spain',
+    desc: "Tarifa's kite-surfing trip was organized with absolute precision. All beach spots and local flight layovers lined up beautifully. Highly recommend the custom route options.",
+    summary: "Highly precise beach routes, surf conditions, and local flight layovers.",
+    image: '/slide-spain.jpg',
+    avatar: '/flatlay-passport.jpg',
+    proof: ['6 Days', '₹1.1L Budget', 'Verified Route'],
+    rating: 5.0
+  }
+];
 
 export default function LandingPage() {
   const navigate = useNavigate();
+  const [activeTestimonialIdx, setActiveTestimonialIdx] = useState(0);
+  const [isTestimonialHovered, setIsTestimonialHovered] = useState(false);
+
+  // Auto-advancing Testimonials Carousel (every 5 seconds, resets on hover or manual change)
+  useEffect(() => {
+    if (isTestimonialHovered) return;
+    const interval = setInterval(() => {
+      setActiveTestimonialIdx((prev) => (prev + 1) % CAROUSEL_STORIES.length);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [isTestimonialHovered, activeTestimonialIdx]);
   const [current, setCurrent] = useState(0);
   const [prev, setPrev] = useState(null);
   const [isAnimating, setIsAnimating] = useState(false);
@@ -1268,6 +1365,169 @@ export default function LandingPage() {
               </div>
             </div>
 
+          </div>
+        </section>
+        {/* ── TRAVELER TESTIMONIALS ── */}
+        <section 
+          className="space-y-10 reveal-on-scroll py-8"
+          onMouseEnter={() => setIsTestimonialHovered(true)}
+          onMouseLeave={() => setIsTestimonialHovered(false)}
+        >
+          <div className="text-center space-y-3">
+            <span className="text-[10px] font-bold tracking-[0.25em] text-[#F5A623] uppercase font-mono">Wanderer Stories</span>
+            <h2 className="text-3xl font-extrabold text-white tracking-tight uppercase" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+              Tested by Real Explorers
+            </h2>
+            <p className="text-xs text-slate-400 font-mono max-w-md mx-auto">
+              See how modern adventurers use TripMate to escape the ordinary.
+            </p>
+          </div>
+
+          {/* 1. FEATURED STORY CARD (Top) */}
+          {(() => {
+            const activeStory = CAROUSEL_STORIES[activeTestimonialIdx];
+            return (
+              <div className="relative group rounded-3xl overflow-hidden border border-slate-800 bg-slate-900/40 backdrop-blur-md shadow-2xl transition-all duration-500 hover:border-[#E8650A]/20 animate-fade-in" key={activeTestimonialIdx}>
+                <div className="grid grid-cols-1 lg:grid-cols-12 items-stretch">
+                  {/* Image Column */}
+                  <div className="lg:col-span-5 min-h-[250px] relative overflow-hidden">
+                    <img 
+                      src={activeStory.image} 
+                      alt={activeStory.destination} 
+                      className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t lg:bg-gradient-to-r from-slate-950 via-slate-950/40 to-transparent" />
+                    
+                    {/* Proof badge & overlay */}
+                    <div className="absolute bottom-6 left-6 right-6 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <img 
+                          src={activeStory.avatar} 
+                          alt={activeStory.name} 
+                          className="w-10 h-10 rounded-full border border-[#E8650A] object-cover"
+                        />
+                        <div>
+                          <h4 className="text-xs font-bold text-white">{activeStory.name}</h4>
+                          <p className="text-[9px] text-slate-300 font-mono">{activeStory.role}</p>
+                        </div>
+                      </div>
+                      <span className="px-2.5 py-1 text-[8px] font-bold uppercase tracking-wider font-mono text-[#F5A623] bg-[#F5A623]/10 border border-[#F5A623]/30 rounded-full">
+                        Featured Explorer
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Text Insight Column */}
+                  <div className="lg:col-span-7 p-6 md:p-8 flex flex-col justify-between space-y-6">
+                    <div className="space-y-4">
+                      {/* Trip proof chips */}
+                      <div className="flex flex-wrap items-center gap-2">
+                        {activeStory.proof.map((p, pi) => (
+                          <span key={pi} className={`px-2 py-0.5 rounded bg-slate-950 border border-slate-800 text-[9px] font-mono ${pi === 1 ? 'text-[#F5A623]' : 'text-slate-300'}`}>
+                            {pi === 0 ? `⏱️ ${p}` : pi === 1 ? `💳 ${p}` : p}
+                          </span>
+                        ))}
+                        <span className="px-2 py-0.5 rounded bg-slate-950 border border-emerald-900/30 bg-emerald-950/10 text-[9px] font-mono text-emerald-400 flex items-center gap-1">
+                          <ShieldCheck size={9} /> Verified Itinerary
+                        </span>
+                      </div>
+
+                      <div className="space-y-2">
+                        <span className="text-[9px] font-mono tracking-widest text-[#F5A623]/60 uppercase">Destination Highlight</span>
+                        <h3 className="text-lg font-bold text-white" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+                          {activeStory.destination}
+                        </h3>
+                      </div>
+
+                      <p className="text-xs md:text-sm text-slate-300 leading-relaxed font-mono italic">
+                        "{activeStory.desc}"
+                      </p>
+                    </div>
+
+                    <div className="pt-4 border-t border-slate-850 flex items-center justify-between text-[10px] text-slate-500 font-mono">
+                      <span>SYSTEM: Verified via FastAPI Engine</span>
+                      {renderStars(activeStory.rating)}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* 2. AUTO-ADVANCING CAROUSEL (Bottom) */}
+          <div className="relative space-y-4">
+            {/* Carousel track wrapper */}
+            <div className="overflow-hidden relative rounded-2xl border border-slate-800 bg-slate-900/25 p-6 min-h-[160px]">
+              <div 
+                className="flex transition-transform duration-500 ease-out" 
+                style={{ transform: `translateX(-${activeTestimonialIdx * 100}%)` }}
+              >
+                {CAROUSEL_STORIES.map((story) => (
+                  <div key={story.id} className="w-full flex-shrink-0 grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
+                    {/* Destination Visual */}
+                    <div className="md:col-span-3 h-28 relative rounded-xl overflow-hidden border border-slate-800">
+                      <img src={story.image} className="w-full h-full object-cover" alt="" />
+                      <div className="absolute inset-0 bg-slate-950/30" />
+                    </div>
+
+                    {/* Feedback and details */}
+                    <div className="md:col-span-9 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <img src={story.avatar} className="w-8 h-8 rounded-full object-cover border border-slate-800" alt="" />
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h4 className="text-xs font-bold text-white">{story.name}</h4>
+                              {renderStars(story.rating)}
+                            </div>
+                            <p className="text-[9px] text-slate-400 font-mono">{story.role} · {story.destination}</p>
+                          </div>
+                        </div>
+
+                        <div className="flex gap-1.5">
+                          {story.proof.map((p, pi) => (
+                            <span key={pi} className="text-[8px] font-mono px-1.5 py-0.5 rounded bg-slate-950 text-slate-400 border border-slate-900">
+                              {p}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+
+                      <p className="text-xs text-slate-300 leading-relaxed font-mono italic">
+                        "{story.summary}"
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Navigation Arrows */}
+              <button 
+                onClick={() => setActiveTestimonialIdx((prev) => (prev - 1 + CAROUSEL_STORIES.length) % CAROUSEL_STORIES.length)}
+                className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full border border-slate-800 bg-slate-950/80 hover:bg-slate-950 text-white flex items-center justify-center cursor-pointer transition-colors shadow-lg z-20"
+              >
+                <ChevronLeft size={14} />
+              </button>
+              <button 
+                onClick={() => setActiveTestimonialIdx((prev) => (prev + 1) % CAROUSEL_STORIES.length)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full border border-slate-800 bg-slate-950/80 hover:bg-slate-950 text-white flex items-center justify-center cursor-pointer transition-colors shadow-lg z-20"
+              >
+                <ChevronRight size={14} />
+              </button>
+            </div>
+
+            {/* Dot Indicators */}
+            <div className="flex justify-center gap-1.5">
+              {CAROUSEL_STORIES.map((story) => (
+                <button
+                  key={story.id}
+                  onClick={() => setActiveTestimonialIdx(story.id)}
+                  className={`h-1.5 rounded-full transition-all duration-300 cursor-pointer ${
+                    activeTestimonialIdx === story.id ? 'w-6 bg-[#E8650A]' : 'w-1.5 bg-slate-800 hover:bg-slate-700'
+                  }`}
+                />
+              ))}
+            </div>
           </div>
         </section>
 
