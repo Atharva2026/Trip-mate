@@ -1,91 +1,136 @@
+# ✈️ Globe Express — Multi-Agent Travel Orchestration Engine
 
-# ✈️ TripMate AI — A Multi-Agent Travel Planner with LangGraph
+Globe Express (powered by TripMate AI) is a production-grade, stateful multi-agent travel planning platform. It leverages **LangGraph**, **FastAPI**, and **React** to compile comprehensive travel itineraries—integrating live flight coordination, target-budget hotel research, geolocation mapping, and weather forecasting—from natural language queries.
 
-An open-source AI travel planner that turns a natural-language trip request into a practical travel plan with flight suggestions, hotel ideas, and a day-by-day itinerary. The project uses a multi-agent workflow built with LangGraph, LangChain, and FastAPI.
+---
 
-# Why this project?
-Planning a trip usually means jumping between multiple websites, tools, and spreadsheets. This project brings that flow into one experience by combining:
+## 🏗️ System Architecture & Workflow
 
-a flight-search agent,
-a hotel-research agent,
-an itinerary-planning agent, and
-a final response agent,
-all coordinated through a LangGraph workflow.
+The core engine is structured as a **Stateful Directed Acyclic Graph (DAG)** built using **LangGraph**. The workflow isolates responsibilities across a team of specialized agents, co-ordinated by a central Supervisor Router.
 
-# Features
-✈️ Flight research using AviationStack
-🏨 Hotel suggestions using Tavily search
-🧠 Multi-agent orchestration with LangGraph
-📝 Structured travel itinerary generation
-🌐 FastAPI backend with a simple web interface
-💾 Conversation state persistence using PostgreSQL
-⚡ LLM-powered responses with Groq
-Tech Stack
-Python 3.10+
-FastAPI
-Jinja2 + HTML/CSS/JavaScript frontend
-LangGraph
-LangChain
-Groq LLMs
-PostgreSQL
-Tavily API
-AviationStack API
-Project Structure
-.
-├── app.py                # FastAPI app entry point
-├── backend.py            # LangGraph travel workflow
-├── requirements.txt      # Python dependencies
-├── static/               # Static frontend assets
-├── templates/            # HTML templates
-└── tools/                # Flight and web search integrations
-Prerequisites
-Before running the project locally, make sure you have:
+```mermaid
+graph TD
+    User([User Query]) --> Supervisor{Supervisor Router}
+    
+    Supervisor -->|flights_only / full_itinerary| FlightAgent[Flight Agent]
+    Supervisor -->|hotels_only / full_itinerary| HotelAgent[Hotel Agent]
+    Supervisor -->|general_chat| FinalAgent[Response Formatter]
+    
+    FlightAgent --> HotelAgent
+    HotelAgent --> ItineraryPlanner[Itinerary Planner]
+    ItineraryPlanner --> QualityAuditor{Quality Auditor / Validator}
+    
+    QualityAuditor -->|Issues Found & Retry < 3| ItineraryPlanner
+    QualityAuditor -->|Validated / Max Retries| FinalAgent
+    
+    FinalAgent --> SSE[Server-Sent Events Stream]
+    SSE --> Frontend[React Dashboard]
+```
 
-Python 3.10 or newer installed
-PostgreSQL running and accessible
-API keys for:
-Groq
-Tavily
-AviationStack
-Environment Variables
-Create a .env file in the project root with the following variables:
+### 🧠 The Multi-Agent Team
 
-DATABASE_URL=postgresql://user:password@localhost:5432/travel_db
-GROQ_API_KEY=your_groq_api_key
-AVIATIONSTACK_API_KEY=your_aviationstack_api_key
-TAVILY_API_KEY=your_tavily_api_key
-DEFAULT_ORIGIN_IATA=DAC
-Installation
-python -m venv .venv
-source .venv/bin/activate   # On Windows: .venv\Scripts\activate
+1. **Supervisor Router**: Inspects user query using structured Pydantic models. Extracts constraints like `companions`, `budget_tier`, `pace`, and `destination`, then routes to the appropriate agent pipeline.
+2. **Flight Search Agent**: Resolves IATA codes via `airportsdata` / `pycountry` database lookups and queries live flight routes using the **AviationStack API**.
+3. **Hotel Research Agent**: Researches accommodations matching the traveler's budget criteria using custom search filters via **Tavily API**.
+4. **Itinerary Planner**: Gathers the flight & hotel outputs and writes a day-by-day itinerary integrating local travel times and dining recommendations.
+5. **Quality Auditor (Validator)**: A critic agent that checks for logical consistency:
+   * Checks if hotel check-in matches flight arrival.
+   * Compares plan cost with the user's budget.
+   * Flags geographic impossibilities.
+   * If errors are found, it triggers a **correction loop** (up to 3 times) back to the planner.
+6. **Response Formatter (Final Agent)**: Formats the plan, injects live weather forecasts (via **wttr.in**), appends high-resolution location imagery (via **Unsplash**), and outputs the payload.
+
+---
+
+## ⚡ Technical Highlights (For Interviews)
+
+*   **Resilient LLM Failovers**: Built with LangChain's `.with_fallbacks()` mechanism. If the primary `llama-3.3-70b-versatile` hits a `429 Rate Limit` on Groq, the engine seamlessly switches to `llama-3.1-8b-instant` mid-execution, preventing pipeline crashes.
+*   **Stateful PostgreSql Checkpointing**: Uses `AsyncPostgresSaver` to persist graph memory. Users can close their browsers and reload their sessions instantly from the database.
+*   **Non-Blocking Real-time Streaming**: Implements Server-Sent Events (SSE) via a custom `asyncio` Queue manager. The backend streams step progress to the React frontend while running intensive tasks in background threads.
+*   **Secure Manual Auth**: Avoids third-party OAuth overhead by using custom local JWT tokens, bcrypt password hashing, and authorization guards.
+
+---
+
+## 📁 Repository Structure
+
+```
+├── app.py                  # FastAPI server & Server-Sent Events (SSE) endpoints
+├── Dockerfile              # Multi-stage Docker builder (React + Python slim compilation)
+├── pyproject.toml          # Project configuration and backend dependencies
+├── requirements.txt        # Production python pins
+├── backend/
+│   ├── auth.py             # JWT token issuance & bcrypt hashing verification
+│   ├── db.py               # PostgreSQL table schemas and trip persistence
+│   ├── graph.py            # LangGraph StateGraph pipeline, fallbacks, & agent logic
+│   └── core/
+│       ├── cache.py        # In-memory caching layer
+│       ├── rate_limit.py   # Token rate-limiter with localhost bypass
+│       └── sse.py          # Real-time event queue manager
+├── tools/
+│   ├── flight_tool.py      # AviationStack integration & IATA resolvers
+│   ├── geocode_tool.py     # Nominatim Geocoding API
+│   ├── image_tool.py       # Unsplash photo library query tool
+│   └── weather_tool.py     # wttr.in weather forecast fetching
+└── frontend/
+    ├── src/
+    │   ├── pages/
+    │   │   ├── Dashboard.jsx   # Interactive plan engine, PDF exports, and stepper UI
+    │   │   └── LandingPage.jsx # Glassmorphic homepage with dynamic testimonials carousel
+    │   └── components/
+    │       └── AgentStepper.jsx # Real-time agent status stepper
+```
+
+---
+
+## ⚙️ Local Development Setup
+
+### 1. Prerequisites
+*   Python `3.11` or newer
+*   Node.js `20.x` or newer
+*   PostgreSQL instance running locally
+
+### 2. Configure Environment Variables
+Create a `.env` file in the root folder:
+```env
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/tripmate
+GROQ_API_KEY=gsk_...
+TAVILY_API_KEY=tvly_...
+AVIATIONSTACK_API_KEY=your_aviationstack_key
+JWT_SECRET=your_secure_random_key_for_auth
+```
+
+### 3. Run the Backend (FastAPI)
+Install dependencies and boot:
+```bash
+# Using uv (highly recommended)
+uv pip install -r requirements.txt
+uv run python app.py
+
+# Or using standard pip
 pip install -r requirements.txt
-Running the App
-Start the FastAPI server:
-
 python app.py
-Then open your browser at:
+```
+The server starts at `http://localhost:8000`.
 
-http://127.0.0.1:8000/
-API Endpoints
-GET /health - Health check
-POST /api/travel - Submit a travel request
-Example request:
+### 4. Run the Frontend (Vite)
+Navigate to the frontend folder, install packages, and start the development server:
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
-curl -X POST http://127.0.0.1:8000/api/travel \
-  -H "Content-Type: application/json" \
-  -d '{"message":"Plan a 3-day trip to Tokyo with a budget of $1200"}'
-How the Workflow Works
-The user submits a travel request.
-The flight agent gathers flight-related information.
-The hotel agent searches for accommodation suggestions.
-The itinerary agent creates a practical travel plan.
-The final agent formats the result into a polished response.
-Contributing
-Contributions are welcome. If you want to improve the app, add new travel features, or fix issues:
+---
 
-Fork the repository
-Create a feature branch
-Make your changes
-Open a pull request
-Acknowledgments
-This project is built with the help of modern LLM tooling and travel APIs, and it is intended as a practical example of combining LangGraph agents with real-world applications.
+## 🐳 Docker Production Build
+
+To run the entire monorepo as a single container (matching the Render production configuration):
+
+```bash
+# Build the unified image
+docker build -t globe-express .
+
+# Run the container
+docker run -p 8000:8000 --env-file .env globe-express
+```
+The container uses a Node Alpine build stage to compile frontend assets, copies them to the FastAPI static directory, and boots the Python server on port `8000`.

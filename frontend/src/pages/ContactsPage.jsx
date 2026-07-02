@@ -71,9 +71,9 @@ export default function ContactsPage() {
         {/* CONTACT CARDS */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 reveal-on-scroll">
           {[
-            { icon: <Mail size={24} />, title: 'Email Us', detail: 'support@globeexpress.ai', sub: 'We respond within 24 hours' },
+            { icon: <Mail size={24} />, title: 'Email Us', detail: 'shahatharva20@gmail.com', sub: 'We respond within 24 hours' },
             { icon: <MessageCircle size={24} />, title: 'Live Chat', detail: 'Available 9am – 9pm IST', sub: 'Instant AI-assisted support' },
-            { icon: <Phone size={24} />, title: 'Call Us', detail: '+91 98765 43210', sub: 'Mon – Sat, 10am – 6pm' },
+            { icon: <Phone size={24} />, title: 'Call Us', detail: '+91 98933*****', sub: 'Mon – Sat, 10am – 6pm' },
           ].map((card, idx) => (
             <div key={idx} className="p-8 rounded-2xl bg-slate-900/60 border border-slate-800 hover:border-[#F5A623]/30 transition-all text-center space-y-4 group">
               <div className="w-14 h-14 rounded-2xl bg-[#E8650A]/10 text-[#E8650A] flex items-center justify-center mx-auto group-hover:bg-[#E8650A]/20 transition-colors">
