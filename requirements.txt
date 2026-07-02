@@ -14,5 +14,3 @@ pycountry==26.2.16
 fastapi==0.136.3
 uvicorn==0.48.0
 jinja2==3.1.6
-
-postgresql://beast:xIVxj65eZBTRz2kBqxo16hHZQfPRDWnD@dpg-d91nnndaeets73fru2p0-a.virginia-postgres.render.com/agentmemory_x4hu
