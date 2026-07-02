@@ -1,136 +1,100 @@
 # ✈️ Globe Express — Multi-Agent Travel Orchestration Engine
 
-Globe Express (powered by TripMate AI) is a production-grade, stateful multi-agent travel planning platform. It leverages **LangGraph**, **FastAPI**, and **React** to compile comprehensive travel itineraries—integrating live flight coordination, target-budget hotel research, geolocation mapping, and weather forecasting—from natural language queries.
+### Problem
+Planning trips today is fragmented and time-consuming. Travelers are forced to hop between flight aggregators, hotel search engines, mapping sites, and weather forecasts, manually copying coordinates and compiling spreadsheets. Globe Express unifies this workflow by utilizing collaborating LLM agents to draft, validate, and build comprehensive, production-ready travel plans dynamically from natural language queries.
+
+### What is Globe Express?
+Globe Express (powered by TripMate AI) is an open-source, community-driven multi-agent travel orchestration hub. It turns standard natural-language trip requests into highly detailed travel itineraries containing live flight quotes, verified hotel selections, day-by-day activity outlines, localized maps, and weather details.
+
+Key highlights of the Globe Express project include:
+*   **Stateful Orchestration**: Coordinated by a central supervisor node via LangGraph, agents interact asynchronously, share progress states, and run validation correction loops.
+*   **Live Data Integration**: Queries real flight data using AviationStack, searches hotels via Tavily, extracts exact coordinates from Nominatim, and gets live weather forecasts from wttr.in.
+*   **Resilient Design**: Automatically catches Groq rate limits (429 errors) on `llama-3.3-70b-versatile` and dynamically routes queries to `llama-3.1-8b-instant` to prevent pipeline failures.
+*   **Save and Export**: Saves itineraries locally to a persistent PostgreSQL database and exports print-ready, style-cleaned travel plan PDFs.
 
 ---
 
-## 🏗️ System Architecture & Workflow
-
-The core engine is structured as a **Stateful Directed Acyclic Graph (DAG)** built using **LangGraph**. The workflow isolates responsibilities across a team of specialized agents, co-ordinated by a central Supervisor Router.
-
-```mermaid
-graph TD
-    User([User Query]) --> Supervisor{Supervisor Router}
-    
-    Supervisor -->|flights_only / full_itinerary| FlightAgent[Flight Agent]
-    Supervisor -->|hotels_only / full_itinerary| HotelAgent[Hotel Agent]
-    Supervisor -->|general_chat| FinalAgent[Response Formatter]
-    
-    FlightAgent --> HotelAgent
-    HotelAgent --> ItineraryPlanner[Itinerary Planner]
-    ItineraryPlanner --> QualityAuditor{Quality Auditor / Validator}
-    
-    QualityAuditor -->|Issues Found & Retry < 3| ItineraryPlanner
-    QualityAuditor -->|Validated / Max Retries| FinalAgent
-    
-    FinalAgent --> SSE[Server-Sent Events Stream]
-    SSE --> Frontend[React Dashboard]
-```
-
-### 🧠 The Multi-Agent Team
-
-1. **Supervisor Router**: Inspects user query using structured Pydantic models. Extracts constraints like `companions`, `budget_tier`, `pace`, and `destination`, then routes to the appropriate agent pipeline.
-2. **Flight Search Agent**: Resolves IATA codes via `airportsdata` / `pycountry` database lookups and queries live flight routes using the **AviationStack API**.
-3. **Hotel Research Agent**: Researches accommodations matching the traveler's budget criteria using custom search filters via **Tavily API**.
-4. **Itinerary Planner**: Gathers the flight & hotel outputs and writes a day-by-day itinerary integrating local travel times and dining recommendations.
-5. **Quality Auditor (Validator)**: A critic agent that checks for logical consistency:
-   * Checks if hotel check-in matches flight arrival.
-   * Compares plan cost with the user's budget.
-   * Flags geographic impossibilities.
-   * If errors are found, it triggers a **correction loop** (up to 3 times) back to the planner.
-6. **Response Formatter (Final Agent)**: Formats the plan, injects live weather forecasts (via **wttr.in**), appends high-resolution location imagery (via **Unsplash**), and outputs the payload.
+### Features
+*   **Open Source**: Built on the principles of transparency and customization. The entire code for both React frontend and Python backend is open and modifiable.
+*   **Free to Use**: Globe Express uses free-tier developer API access keys for Groq, Tavily, and AviationStack, enabling self-hosting without premium pricing gates.
+*   **Flexible Hosting**: Supports running the Python FastAPI and Vite React packages locally in split-terminal modes or building a single unified container for fast cloud deployment.
+*   **Structured Validation Loops**: An auditor agent automatically validates checks (e.g. check-in date matching flight arrival) and prompts the planner agent for repairs up to 3 times before finalizing.
 
 ---
 
-## ⚡ Technical Highlights (For Interviews)
-
-*   **Resilient LLM Failovers**: Built with LangChain's `.with_fallbacks()` mechanism. If the primary `llama-3.3-70b-versatile` hits a `429 Rate Limit` on Groq, the engine seamlessly switches to `llama-3.1-8b-instant` mid-execution, preventing pipeline crashes.
-*   **Stateful PostgreSql Checkpointing**: Uses `AsyncPostgresSaver` to persist graph memory. Users can close their browsers and reload their sessions instantly from the database.
-*   **Non-Blocking Real-time Streaming**: Implements Server-Sent Events (SSE) via a custom `asyncio` Queue manager. The backend streams step progress to the React frontend while running intensive tasks in background threads.
-*   **Secure Manual Auth**: Avoids third-party OAuth overhead by using custom local JWT tokens, bcrypt password hashing, and authorization guards.
+### ⚠️ Important Note: Rate Limiting & API Quotas
+*   **Groq Token Limitations**: The default high-capacity LLM `llama-3.3-70b-versatile` has daily token quotas (TPD). If you hit a `Rate Limit Reached (429)` error, the backend will automatically fallback to the faster `llama-3.1-8b-instant` model.
+*   **Localhost Rate-Limit Bypass**: Loopback IP addresses (`127.0.0.1`, `::1`, `localhost`) bypass local API tier rate limiting to allow uninterrupted developer testing and design iteration.
 
 ---
 
-## 📁 Repository Structure
+### 🏁 Installation
 
-```
-├── app.py                  # FastAPI server & Server-Sent Events (SSE) endpoints
-├── Dockerfile              # Multi-stage Docker builder (React + Python slim compilation)
-├── pyproject.toml          # Project configuration and backend dependencies
-├── requirements.txt        # Production python pins
-├── backend/
-│   ├── auth.py             # JWT token issuance & bcrypt hashing verification
-│   ├── db.py               # PostgreSQL table schemas and trip persistence
-│   ├── graph.py            # LangGraph StateGraph pipeline, fallbacks, & agent logic
-│   └── core/
-│       ├── cache.py        # In-memory caching layer
-│       ├── rate_limit.py   # Token rate-limiter with localhost bypass
-│       └── sse.py          # Real-time event queue manager
-├── tools/
-│   ├── flight_tool.py      # AviationStack integration & IATA resolvers
-│   ├── geocode_tool.py     # Nominatim Geocoding API
-│   ├── image_tool.py       # Unsplash photo library query tool
-│   └── weather_tool.py     # wttr.in weather forecast fetching
-└── frontend/
-    ├── src/
-    │   ├── pages/
-    │   │   ├── Dashboard.jsx   # Interactive plan engine, PDF exports, and stepper UI
-    │   │   └── LandingPage.jsx # Glassmorphic homepage with dynamic testimonials carousel
-    │   └── components/
-    │       └── AgentStepper.jsx # Real-time agent status stepper
-```
-
----
-
-## ⚙️ Local Development Setup
-
-### 1. Prerequisites
-*   Python `3.11` or newer
-*   Node.js `20.x` or newer
-*   PostgreSQL instance running locally
-
-### 2. Configure Environment Variables
-Create a `.env` file in the root folder:
+#### 📦 Using Docker (recommended)
+To run the Globe Express project inside a single container using the multi-stage build:
+1. Make sure you have Docker installed.
+2. Clone the repository.
+3. Create a `.env` file in the root folder using the template below:
 ```env
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/tripmate
-GROQ_API_KEY=gsk_...
-TAVILY_API_KEY=tvly_...
+DATABASE_URL=postgresql://user:password@localhost:5432/travel_db
+GROQ_API_KEY=your_groq_api_key
+TAVILY_API_KEY=your_tavily_api_key
 AVIATIONSTACK_API_KEY=your_aviationstack_key
-JWT_SECRET=your_secure_random_key_for_auth
+JWT_SECRET=your_jwt_signing_secret_key
+DEFAULT_ORIGIN_IATA=BOM
 ```
-
-### 3. Run the Backend (FastAPI)
-Install dependencies and boot:
+4. Build the unified Docker image:
 ```bash
-# Using uv (highly recommended)
-uv pip install -r requirements.txt
-uv run python app.py
+docker build -t globe-express .
+```
+5. Run the container:
+```bash
+docker run -p 8000:8000 --env-file .env globe-express
+```
+6. Access the site at `http://localhost:8000`.
 
-# Or using standard pip
+#### 💻 Running locally
+To run both backend and frontend servers locally on your machine:
+1. **Configure Backend**:
+```bash
+# Setup virtual environment
+python3 -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
+# Install requirements & start FastAPI
 pip install -r requirements.txt
 python app.py
 ```
-The server starts at `http://localhost:8000`.
-
-### 4. Run the Frontend (Vite)
-Navigate to the frontend folder, install packages, and start the development server:
+2. **Configure Frontend**:
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
+3. Access the interactive web interface at `http://localhost:5173`.
+
+#### 🚄 Using Render (One-click Web Service)
+To deploy Globe Express to Render:
+1. Click **New > PostgreSQL** on Render to spin up a database and copy the **Internal Database URL**.
+2. Click **New > Web Service** and connect your repository.
+3. Select **Runtime: Docker** (Render will automatically execute the multi-stage build).
+4. Add the environment variables in the service settings page:
+   * `DATABASE_URL` (Set to your Render Internal Database URL)
+   * `GROQ_API_KEY` (Your Groq secret key)
+   * `TAVILY_API_KEY` (Your Tavily secret key)
+   * `AVIATIONSTACK_API_KEY` (Your AviationStack key)
+   * `JWT_SECRET` (A strong random secret)
+   * `PORT` (8000)
+5. Click **Deploy Web Service**.
 
 ---
 
-## 🐳 Docker Production Build
+### 🧪 Testing
+We maintain rigorous validation checks to ensure zero syntax or package crashes before code gets committed or deployed.
 
-To run the entire monorepo as a single container (matching the Render production configuration):
-
+#### 💻 Run Compile & Import Audits
+To compile all Python files in the codebase and check for missing modules or syntax exceptions, run:
 ```bash
-# Build the unified image
-docker build -t globe-express .
-
-# Run the container
-docker run -p 8000:8000 --env-file .env globe-express
+python3 -m py_compile app.py backend/*.py tools/*.py
 ```
-The container uses a Node Alpine build stage to compile frontend assets, copies them to the FastAPI static directory, and boots the Python server on port `8000`.
+Make sure all test files compile cleanly without any warnings before triggering a deploy build.
