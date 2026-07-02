@@ -386,3 +386,76 @@ h1, h2, h3, h4, h5, h6 {
     height: auto;
   }
 }
+
+/* Animated Cyber Globe Styles */
+.flight-path-arc {
+  stroke-dasharray: 6, 4;
+  animation: flightFlow 1.2s linear infinite;
+}
+
+@keyframes flightFlow {
+  from {
+    stroke-dashoffset: 20;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.radar-sweep-group {
+  transform-origin: 160px 160px;
+  animation: radarSweepRotate 6s linear infinite;
+}
+
+@keyframes radarSweepRotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.globe-destination-marker {
+  animation: markerPulse 1.8s ease-in-out infinite alternate;
+}
+
+@keyframes markerPulse {
+  0% {
+    r: 3px;
+    fill: #475569;
+  }
+  100% {
+    r: 5px;
+    fill: #E8650A;
+  }
+}
+
+/* Cinematic Hero Slider: Zoom-Fly-Merge card transition styles */
+.slide-incoming-bg {
+  transform: scale(0.2) translate(180%, 15%);
+  border-radius: 20px;
+  opacity: 0.15;
+  transition: transform 950ms cubic-bezier(0.16, 1, 0.3, 1), 
+              border-radius 950ms cubic-bezier(0.16, 1, 0.3, 1), 
+              opacity 900ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.slide-incoming-bg.slide-merged-bg {
+  transform: scale(1) translate(0, 0);
+  border-radius: 0px;
+  opacity: 1;
+}
+
+.slide-outgoing-bg {
+  opacity: 1;
+  transform: scale(1);
+  transition: opacity 950ms cubic-bezier(0.16, 1, 0.3, 1),
+              transform 950ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.slide-outgoing-bg.slide-fade-out {
+  opacity: 0;
+  transform: scale(1.06);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}

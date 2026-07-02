@@ -85,11 +85,13 @@ export default function Dashboard() {
   const [saveStatus, setSaveStatus] = useState("unsaved"); // unsaved, saving, saved, error
   const [saveMessage, setSaveMessage] = useState(null);
   const pdfRef = useRef(null);
+  const isStreamFinished = useRef(false);
 
   // Prefill state from questionnaire wizard if available
   useEffect(() => {
-    if (locationState?.prefilledPrompt) {
-      setQuery(locationState.prefilledPrompt);
+    const promptText = locationState?.prefilledPrompt || locationState?.prefill;
+    if (promptText) {
+      setQuery(promptText);
       if (locationState.travelContext) {
         setTravelContext(locationState.travelContext);
       }
@@ -117,6 +119,7 @@ export default function Dashboard() {
     const messageText = (textToSend || query).trim();
     if (!messageText) return;
 
+    isStreamFinished.current = false;
     setLoading(true);
     setError(null);
     setResult(null);
@@ -168,6 +171,7 @@ export default function Dashboard() {
 
         if (evData.done) {
           if (evData.node === 'final_agent' && evData.payload) {
+            isStreamFinished.current = true;
             setResult(evData.payload);
             setLoading(false);
             eventSource.close();
@@ -198,6 +202,7 @@ export default function Dashboard() {
             saveHistory(updatedHistory);
 
           } else if (evData.node === 'error') {
+            isStreamFinished.current = true;
             setError(evData.message || "An error occurred in the multi-agent graph.");
             setLoading(false);
             eventSource.close();
@@ -206,6 +211,7 @@ export default function Dashboard() {
       };
 
       eventSource.onerror = (err) => {
+        if (isStreamFinished.current) return;
         console.error("SSE stream error:", err);
         setError("Streaming pipeline disconnected. Please try again.");
         setLoading(false);

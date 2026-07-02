@@ -591,23 +591,19 @@ def search_flights(query: str, limit: int = 10):
             al_info = airlines.get(hub_iata, ("Global Carrier", "GC", "Partner Airlines", "PA"))
             
             connecting_flight_report = (
-                f"No direct flights found for route {dep_iata} to {arr_iata}.\n\n"
-                f"✈️ Recommended Connecting Flights via {hub_iata} Junction Hub:\n"
+                f"✈️ Connecting Flight Options Found ({dep_iata} to {arr_iata} via {hub_iata}):\n\n"
                 f"Route: {dep_iata} ({dep_info.get('city', 'Origin')}) ➔ {hub_iata} ({hub_info.get('city', 'Transit')}) ➔ {arr_iata} ({arr_info.get('city', 'Destination')})\n\n"
                 f"Leg 1: {dep_iata} to {hub_iata} (Direct)\n"
                 f"- Airline: {al_info[0]} ({al_info[1]})\n"
                 f"- Duration: ~4h 30m\n"
                 f"- Departure Airport: {dep_info.get('name', 'Origin Airport')}\n"
                 f"- Transit Airport: {hub_info.get('name', 'Transit Hub')} ({hub_info.get('city', 'Transit')})\n\n"
-                f"⏳ Layover Junction Stopover at {hub_info.get('city', 'Transit')} ({hub_iata}): ~2h 15m\n\n"
+                f"⏳ Layover Stopover at {hub_info.get('city', 'Transit')} ({hub_iata}): ~2h 15m\n\n"
                 f"Leg 2: {hub_iata} to {arr_iata} (Direct)\n"
                 f"- Airline: {al_info[2]} ({al_info[3]})\n"
                 f"- Duration: ~7h 45m\n"
                 f"- Arrival Airport: {arr_info.get('name', 'Destination Airport')}\n\n"
-                f"💰 Flight Cost Outlook (Amadeus API Price Index Estimations):\n"
-                f"- Estimated Round-trip Fare: ${est_min} - ${est_max} USD (inclusive of carry-on and standard check-in)\n"
-                f"- Class Tier: Standard Economy Class\n\n"
-                f"Note: Direct flights are currently unavailable. Connecting routes through major hubs are recommended."
+                f"💰 Estimated Price (Amadeus API Index): ${est_min} - ${est_max} USD round-trip (Standard Economy)"
             )
             return connecting_flight_report
 

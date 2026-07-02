@@ -322,6 +322,7 @@ async def travel_stream(thread_id: str):
                 
                 # Close connection if finalized or error occurs
                 if event.get("done") and (event.get("node") == "final_agent" or event.get("node") == "error"):
+                    await asyncio.sleep(0.5)
                     break
         except asyncio.CancelledError:
             logger.info(f"SSE stream client disconnected for thread_id={thread_id}")

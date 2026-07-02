@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  Search, User, MapPin, ChevronLeft, ChevronRight, 
-  ArrowDown, Plane, Hotel, CalendarDays, Sparkles, 
+import {
+  Search, User, MapPin, ChevronLeft, ChevronRight,
+  ArrowDown, Plane, Hotel, CalendarDays, Sparkles,
   ArrowRight, Compass, CompassIcon, Info, HelpCircle,
   ShieldCheck, ExternalLink, BookmarkCheck
 } from 'lucide-react';
@@ -55,6 +55,133 @@ const SLIDES = [
   },
 ];
 
+const QUIZ_QUESTIONS = [
+  {
+    key: 'vibe',
+    title: "What's the vibe you're chasing?",
+    subtitle: "Select the atmosphere that matches your wanderlust",
+    options: [
+      { value: 'relax', label: 'Relax & recharge', emoji: '🧘' },
+      { value: 'adventure', label: 'Adventure & outdoors', emoji: '⛰️' },
+      { value: 'culture', label: 'Culture & history', emoji: '⛩️' },
+      { value: 'party', label: 'Party & nightlife', emoji: '🎉' },
+      { value: 'romance', label: 'Romance', emoji: '💖' },
+      { value: 'family', label: 'Family fun', emoji: '🎡' }
+    ]
+  },
+  {
+    key: 'companion',
+    title: "Who are you travelling with?",
+    subtitle: "Travel size shapes the local pacing and hotel choices",
+    options: [
+      { value: 'solo', label: 'Solo Traveler', emoji: '🎒' },
+      { value: 'couple', label: 'Couple', emoji: '👩‍❤️‍👨' },
+      { value: 'friends', label: 'Friends Group', emoji: '🍻' },
+      { value: 'kids', label: 'Family with kids', emoji: '👶' },
+      { value: 'nokids', label: 'Family without kids', emoji: '👨‍👩‍👧' }
+    ]
+  },
+  {
+    key: 'budget',
+    title: "What's your total budget per person?",
+    subtitle: "Helps us filter geographical tiers and travel costs",
+    options: [
+      { value: 'under30k', label: 'Under ₹30,000', emoji: '💳' },
+      { value: '30k-75k', label: '₹30k – ₹75k', emoji: '💵' },
+      { value: '75k-1.5L', label: '₹75k – ₹1.5L', emoji: '💸' },
+      { value: '1.5L-3L', label: '₹1.5L – ₹3L', emoji: '💰' },
+      { value: '3Lplus', label: '₹3L+', emoji: '💎' }
+    ]
+  },
+  {
+    key: 'duration',
+    title: "How long is your trip?",
+    subtitle: "Time shapes distance and scheduling depth",
+    options: [
+      { value: 'weekend', label: 'Weekend (2–3 days)', emoji: '⏰' },
+      { value: 'short', label: 'Short (4–6 days)', emoji: '📅' },
+      { value: 'oneweek', label: 'One week', emoji: '✈️' },
+      { value: 'twoweeks', label: '2 weeks', emoji: '🌍' },
+      { value: 'month', label: '1 month+', emoji: '🧭' }
+    ]
+  },
+  {
+    key: 'dealbreaker',
+    title: "What's one thing that would make or break this trip?",
+    subtitle: "The ultimate tiebreaker filter for matching regions",
+    options: [
+      { value: 'beach', label: 'Must have beach', emoji: '🏖️' },
+      { value: 'mountains', label: 'Must have mountains', emoji: '🏔️' },
+      { value: 'streetfood', label: 'Must have street food scene', emoji: '🍜' },
+      { value: 'safesolo', label: 'Must be safe for solo woman', emoji: '🛡️' },
+      { value: 'hiking', label: 'Must have good hiking', emoji: '🥾' },
+      { value: 'luxury', label: 'Must have luxury hotels', emoji: '🏨' },
+      { value: 'english', label: 'Must be English-friendly', emoji: '🗣️' },
+      { value: 'visa', label: 'Must have visa on arrival', emoji: '🛂' }
+    ]
+  }
+];
+
+const calculateDestination = (ans) => {
+  const vibe = (ans.vibe || "").toLowerCase();
+  const companion = (ans.companion || "").toLowerCase();
+  const budget = ans.budget || "";
+  const duration = ans.duration || "";
+  const dealbreaker = (ans.dealbreaker || "").toLowerCase();
+
+  if (vibe.includes("romance") || dealbreaker.includes("luxury")) {
+    return {
+      name: "Marrakech, Morocco",
+      desc: "A sensory wanderlust of private candlelit courtyards, luxury riads, and amber dunes under infinite starry skies.",
+      img: "/slide-morocco.jpg",
+      query: "Plan a luxury 7-day romantic honeymoon in Marrakech, Morocco, staying in a premium riad with desert camel tours."
+    };
+  }
+
+  if (vibe.includes("adventure") || dealbreaker.includes("hiking") || dealbreaker.includes("mountains")) {
+    if (budget.includes("1.5L") || budget.includes("3L") || budget.includes("75k")) {
+      return {
+        name: "Switzerland Alps",
+        desc: "Untouched snow peaks, deep valleys, and majestic alpine trails. The peak of mountain trekking and outdoor luxury.",
+        img: "/slide-switzerland.jpg",
+        query: "Plan a 10-day alpine hiking retreat in Saint Antönien, Switzerland, focusing on valley trails and chalet stays."
+      };
+    } else {
+      return {
+        name: "Yosemite, USA",
+        desc: "Giant granite domes, sequoia forests, and roaring rivers. Best for campers, van life, and mountain road trips.",
+        img: "/slide-yosemite.jpg",
+        query: "Plan a road trip with camper van campgrounds and scenic hikes in Yosemite National Park."
+      };
+    }
+  }
+
+  if (vibe.includes("culture") || vibe.includes("history") || dealbreaker.includes("streetfood")) {
+    return {
+      name: "Kyoto & Nagano, Japan",
+      desc: "Charming wooden shrines, red pagoda leaves, and historic mountain temples. The perfect blend of heritage and street food.",
+      img: "/slide-nagano.jpg",
+      query: "Plan a cultural 7-day holiday in Kyoto and Nagano, focusing on historic temples and local street food tours."
+    };
+  }
+
+  if (vibe.includes("party") || vibe.includes("nightlife") || dealbreaker.includes("beach")) {
+    return {
+      name: "Los Lances Beach, Spain",
+      desc: "Golden coastlines where high winds and ocean waves meet world-famous sunset beach club parties.",
+      img: "/slide-spain.jpg",
+      query: "Plan a 5-day holiday in Tarifa, Spain, focusing on beaches, windsurfing, and evening parties."
+    };
+  }
+
+  return {
+    name: "Marrakech, Morocco",
+    desc: "A sensory wanderlust of private candlelit courtyards, luxury riads, and amber dunes under infinite starry skies.",
+    img: "/slide-morocco.jpg",
+    query: "Plan a luxury 7-day romantic honeymoon in Marrakech, Morocco, staying in a premium riad with desert camel tours."
+  };
+};
+
 const DURATION = 8000;
 
 export default function LandingPage() {
@@ -65,12 +192,38 @@ export default function LandingPage() {
   const [textVisible, setTextVisible] = useState(true);
   const [progressKey, setProgressKey] = useState(0);
   const [demoInput, setDemoInput] = useState('');
+
+  // Globe Recommendation Quiz States
+  const [quizStep, setQuizStep] = useState(1);
+  const [quizAnswers, setQuizAnswers] = useState({
+    vibe: '',
+    companion: '',
+    budget: '',
+    duration: '',
+    dealbreaker: ''
+  });
+  const [quizRecommendation, setQuizRecommendation] = useState(null);
+  const [slideStatus, setSlideStatus] = useState('static'); // 'static', 'merging', 'active'
+
   const autoTimer = useRef(null);
   const scrollRef = useRef(null);
 
+  const handleSelectOption = (key, value) => {
+    const nextAnswers = { ...quizAnswers, [key]: value };
+    setQuizAnswers(nextAnswers);
+
+    if (quizStep < 5) {
+      setQuizStep(quizStep + 1);
+    } else {
+      const rec = calculateDestination(nextAnswers);
+      setQuizRecommendation(rec);
+      setQuizStep(6);
+    }
+  };
+
   // Mouse ambient spotlight glow state
   const [mousePos, setMousePos] = useState({ x: -1000, y: -1000 });
-  
+
   // Scroll percentage reading tracker
   const [scrollProgress, setScrollProgress] = useState(0);
 
@@ -120,15 +273,21 @@ export default function LandingPage() {
     setIsAnimating(true);
     setTextVisible(false);
     setPrev(current);
+
+    setSlideStatus('merging');
+    setCurrent(idx);
+    setProgressKey(k => k + 1);
+
     setTimeout(() => {
-      setCurrent(idx);
-      setProgressKey(k => k + 1);
-      setTimeout(() => {
-        setTextVisible(true);
-        setIsAnimating(false);
-        setPrev(null);
-      }, 100);
-    }, 500);
+      setSlideStatus('active');
+    }, 40);
+
+    setTimeout(() => {
+      setTextVisible(true);
+      setIsAnimating(false);
+      setPrev(null);
+      setSlideStatus('static');
+    }, 950);
   }, [current, isAnimating]);
 
   const next = useCallback(() => goTo((current + 1) % SLIDES.length), [current, goTo]);
@@ -158,17 +317,17 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen bg-[#0D1B2A] text-slate-200 font-sans selection:bg-[#F5A623]/30 selection:text-[#a06f40]">
-      
+
       {/* ── TOP READING SCROLL PROGRESS BAR ── */}
       <div className="fixed top-0 left-0 right-0 h-[2px] z-[101] bg-transparent">
-        <div 
+        <div
           className="h-full bg-gradient-to-r from-[#E8650A] to-[#F5A623] transition-all duration-75"
           style={{ width: `${scrollProgress}%` }}
         />
       </div>
 
       {/* ── CURSOR AMBIENT GLOW SPOTLIGHT ── */}
-      <div 
+      <div
         className="pointer-events-none fixed z-30 w-[350px] h-[350px] rounded-full mix-blend-screen bg-radial blur-[80px] opacity-[0.22] transition-all duration-300 ease-out"
         style={{
           background: 'radial-gradient(circle, rgba(245, 166, 35, 0.18) 0%, transparent 70%)',
@@ -176,7 +335,7 @@ export default function LandingPage() {
           top: `${mousePos.y - 175}px`,
         }}
       />
-      
+
       {/* ── TOP LOADING PROGRESS BAR ── */}
       <div className="fixed top-0 left-0 right-0 h-[3px] z-[100] bg-slate-900/60/10">
         <div
@@ -198,22 +357,28 @@ export default function LandingPage() {
         </div>
 
         <nav className="hidden lg:flex items-center gap-8">
-          {['HOME', 'HOLIDAYS', 'DESTINATIONS', 'FLIGHTS', 'OFFERS', 'CONTACTS'].map((link, i) => (
-            <a key={link} href="#" 
-              onClick={(e) => { e.preventDefault(); if(link==='DESTINATIONS') scrollToMore(); }}
-              className="text-[10px] font-bold tracking-[0.2em] text-white/80 hover:text-white uppercase transition-colors">
-              {link}
+          {[
+            { label: 'HOME', path: '/' },
+            { label: 'HOLIDAYS', path: '/holidays' },
+            { label: 'DESTINATIONS', path: '/destinations' },
+            { label: 'FLIGHTS', path: '/flights' },
+            { label: 'OFFERS', path: '/offers' },
+            { label: 'CONTACTS', path: '/contacts' }
+          ].map(link => (
+            <a key={link.label} onClick={() => navigate(link.path)}
+              className="text-[10px] font-bold tracking-[0.2em] text-white/80 hover:text-white uppercase transition-colors cursor-pointer">
+              {link.label}
             </a>
           ))}
         </nav>
 
         <div className="flex items-center gap-4">
-          <button 
+          <button
             onClick={() => navigate('/my-trips')}
             className="text-[10px] font-bold tracking-[0.2em] text-white/80 hover:text-white uppercase transition-colors bg-transparent border-none cursor-pointer">
             My Trips
           </button>
-          <button 
+          <button
             onClick={() => navigate('/planner')}
             className="flex items-center gap-2 px-5 py-2.5 rounded-full text-[10px] font-bold tracking-[0.15em] uppercase transition-all shadow-md"
             style={{ background: '#F5A623', color: '#fff' }}
@@ -231,14 +396,17 @@ export default function LandingPage() {
         {/* Previous background image */}
         {prevSlide && (
           <div
-            className="absolute inset-0 bg-center bg-cover z-0 transition-opacity duration-700 ease-in-out opacity-0"
+            className={`absolute inset-0 bg-center bg-cover z-0 ${slideStatus === 'merging' || slideStatus === 'active' ? 'slide-outgoing-bg slide-fade-out' : 'opacity-0'
+              }`}
             style={{ backgroundImage: `url(${prevSlide.image})` }}
           />
         )}
         {/* Current background image */}
         <div
-          className="absolute inset-0 bg-center bg-cover z-0 transition-opacity duration-700 ease-in-out"
-          style={{ backgroundImage: `url(${slide.image})`, opacity: 1 }}
+          className={`absolute inset-0 bg-center bg-cover z-0 ${slideStatus === 'merging' ? 'slide-incoming-bg' :
+            slideStatus === 'active' ? 'slide-incoming-bg slide-merged-bg' : ''
+            }`}
+          style={{ backgroundImage: `url(${slide.image})` }}
         />
 
         {/* Cinematic gradient mask overlays */}
@@ -248,10 +416,10 @@ export default function LandingPage() {
         {/* Content wrapper */}
         <div className="absolute inset-0 z-10 flex items-center">
           <div className="w-full max-w-7xl mx-auto px-6 lg:px-12 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-8 mt-12">
-            
+
             {/* Left side texts */}
             <div className="max-w-[480px]">
-              <div 
+              <div
                 className="text-[10px] font-bold tracking-[0.3em] uppercase mb-4 text-[#F5A623] transition-all duration-500 font-mono"
                 style={{
                   opacity: textVisible ? 1 : 0,
@@ -259,7 +427,7 @@ export default function LandingPage() {
                 }}>
                 {slide.region}
               </div>
-              <h1 
+              <h1
                 className="text-white font-extrabold uppercase leading-[0.9] tracking-tight mb-6 transition-all duration-600"
                 style={{
                   fontFamily: "'Playfair Display', Georgia, serif",
@@ -272,7 +440,7 @@ export default function LandingPage() {
                 }}>
                 {slide.title}
               </h1>
-              <p 
+              <p
                 className="text-white/70 text-xs md:text-sm leading-relaxed mb-8 transition-all duration-500"
                 style={{
                   opacity: textVisible ? 1 : 0,
@@ -281,14 +449,14 @@ export default function LandingPage() {
                 }}>
                 {slide.desc}
               </p>
-              <div 
+              <div
                 className="flex items-center gap-3 transition-all duration-500"
                 style={{
                   opacity: textVisible ? 1 : 0,
                   transform: textVisible ? 'translateY(0)' : 'translateY(12px)',
                   transitionDelay: '150ms'
                 }}>
-                <button 
+                <button
                   onClick={() => navigate('/planner')}
                   className="flex items-center gap-2 px-6 py-3.5 rounded-full text-[10px] font-bold tracking-[0.2em] text-white uppercase transition-all bg-slate-900/60/10 hover:bg-slate-900/60/20 border border-white/30 backdrop-blur-md">
                   <span>Discover Location</span>
@@ -300,23 +468,66 @@ export default function LandingPage() {
             </div>
 
             {/* Right side next cards queue */}
-            <div className="hidden lg:flex items-center gap-4">
-              {queue.slice(0, 3).map((s, idx) => (
-                <div 
-                  key={s.id}
-                  onClick={() => goTo(s.id)}
-                  className="relative w-[130px] h-[190px] rounded-xl overflow-hidden cursor-pointer group transition-all duration-500 border border-white/10 hover:border-[#F5A623]/60 shadow-lg"
-                  style={{
-                    opacity: idx === 0 ? 1 : idx === 1 ? 0.8 : 0.55,
-                    transform: `scale(${idx === 0 ? 1 : idx === 1 ? 0.94 : 0.88})`,
-                  }}>
-                  <img src={s.image} alt={s.cardLabel} className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
-                  <span className="absolute bottom-3 left-3 right-3 text-[8px] font-bold tracking-widest text-white uppercase line-clamp-1 font-mono">
-                    {s.cardLabel}
-                  </span>
-                </div>
-              ))}
+            <div className="hidden lg:block relative w-[422px] h-[190px] overflow-visible">
+              {SLIDES.map((s) => {
+                const relativeIndex = (s.id - current + SLIDES.length) % SLIDES.length;
+
+                let leftPosition = 0;
+                let scale = 1;
+                let opacity = 0;
+                let pointerEvents = 'auto';
+                let zIndex = 0;
+
+                if (relativeIndex === 1) {
+                  leftPosition = 0;
+                  scale = 1;
+                  opacity = 1;
+                  zIndex = 30;
+                } else if (relativeIndex === 2) {
+                  leftPosition = 146;
+                  scale = 0.94;
+                  opacity = 0.8;
+                  zIndex = 20;
+                } else if (relativeIndex === 3) {
+                  leftPosition = 292;
+                  scale = 0.88;
+                  opacity = 0.55;
+                  zIndex = 10;
+                } else if (relativeIndex === 0) {
+                  leftPosition = -146;
+                  scale = 1.1;
+                  opacity = 0;
+                  pointerEvents = 'none';
+                  zIndex = 40;
+                } else {
+                  leftPosition = 438;
+                  scale = 0.8;
+                  opacity = 0;
+                  pointerEvents = 'none';
+                  zIndex = 0;
+                }
+
+                return (
+                  <div
+                    key={s.id}
+                    onClick={() => goTo(s.id)}
+                    className="absolute top-0 w-[130px] h-[190px] rounded-xl overflow-hidden cursor-pointer group border border-white/10 hover:border-[#F5A623]/60 shadow-lg"
+                    style={{
+                      left: `${leftPosition}px`,
+                      opacity: opacity,
+                      transform: `scale(${scale})`,
+                      pointerEvents: pointerEvents,
+                      zIndex: zIndex,
+                      transition: 'left 850ms cubic-bezier(0.16, 1, 0.3, 1), transform 850ms cubic-bezier(0.16, 1, 0.3, 1), opacity 850ms cubic-bezier(0.16, 1, 0.3, 1)',
+                    }}>
+                    <img src={s.image} alt={s.cardLabel} className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
+                    <span className="absolute bottom-3 left-3 right-3 text-[8px] font-bold tracking-widest text-white uppercase line-clamp-1 font-mono">
+                      {s.cardLabel}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
 
           </div>
@@ -333,7 +544,7 @@ export default function LandingPage() {
             </button>
           </div>
 
-          <div 
+          <div
             onClick={scrollToMore}
             className="hidden md:flex flex-col items-center gap-1 cursor-pointer text-white/55 hover:text-white transition-all font-mono text-[9px] tracking-[0.2em]">
             <span>EXPLORE SCROLL</span>
@@ -378,7 +589,7 @@ export default function LandingPage() {
               Open up maps, cross-reference travel times, and preview destinations instantly with visual tags and estimated prices.
             </p>
             <div className="pt-2">
-              <button 
+              <button
                 onClick={() => navigate('/planner')}
                 className="flex items-center gap-2.5 px-6 py-3 rounded-full text-xs font-bold tracking-widest text-white uppercase transition-all shadow-md"
                 style={{ background: '#0f172a' }}
@@ -394,10 +605,10 @@ export default function LandingPage() {
             {/* Flatlay image display frame */}
             <div className="relative rounded-3xl overflow-hidden shadow-2xl border border-slate-800 bg-slate-900/60 p-3 group">
               <div className="absolute inset-0 bg-gradient-to-tr from-[#F5A623]/10 to-transparent pointer-events-none rounded-3xl" />
-              <img 
-                src="/hero-flatlay.png" 
-                alt="Travel Preparation Flatlay" 
-                className="w-full aspect-[4/3] object-cover rounded-2xl transition-transform duration-700 group-hover:scale-[1.02]" 
+              <img
+                src="/hero-flatlay.png"
+                alt="Travel Preparation Flatlay"
+                className="w-full aspect-[4/3] object-cover rounded-2xl transition-transform duration-700 group-hover:scale-[1.02]"
               />
               {/* Badge Overlay */}
               <div className="absolute top-6 left-6 px-3 py-1.5 rounded-lg bg-slate-900/60/90 backdrop-blur-md shadow-sm border border-slate-800 text-[10px] font-bold tracking-widest text-slate-800 uppercase flex items-center gap-1.5 font-mono">
@@ -414,10 +625,10 @@ export default function LandingPage() {
             {/* Mood Board frame */}
             <div className="relative rounded-3xl overflow-hidden shadow-2xl border border-slate-800 bg-slate-900/60 p-3 group">
               <div className="absolute inset-0 bg-gradient-to-bl from-sky-500/5 to-transparent pointer-events-none rounded-3xl" />
-              <img 
-                src="/travel-board.png" 
-                alt="Travel Mood Board" 
-                className="w-full aspect-[4/3] object-cover rounded-2xl transition-transform duration-700 group-hover:scale-[1.02]" 
+              <img
+                src="/travel-board.png"
+                alt="Travel Mood Board"
+                className="w-full aspect-[4/3] object-cover rounded-2xl transition-transform duration-700 group-hover:scale-[1.02]"
               />
               <div className="absolute bottom-6 right-6 px-3.5 py-2 rounded-lg bg-slate-900/95 backdrop-blur-md shadow-sm text-[10px] font-bold tracking-widest text-white uppercase flex items-center gap-1.5 font-mono">
                 <BookmarkCheck size={12} className="text-[#F5A623]" />
@@ -442,7 +653,7 @@ export default function LandingPage() {
               Every plan generates high-resolution destination galleries, a validation checklist, and estimated price ranges for transparency.
             </p>
             <div className="pt-2">
-              <button 
+              <button
                 onClick={() => navigate('/planner')}
                 className="flex items-center gap-2.5 px-6 py-3 rounded-full text-xs font-bold tracking-widest text-slate-200 bg-slate-900/60 hover:bg-slate-900/50 border border-slate-800 uppercase transition-all shadow-sm">
                 <span>Try Demo Board</span>
@@ -479,7 +690,7 @@ export default function LandingPage() {
                 </div>
               </div>
               <div className="p-6 pt-0">
-                <button 
+                <button
                   onClick={() => navigate('/planner', { state: { prefill: 'Plan a 5-day beach holiday in Tarifa, Spain under €1000' } })}
                   className="w-full text-center py-2.5 rounded-lg text-[10px] font-bold tracking-wider text-[#F5A623] bg-[#F5A623]/10 hover:bg-[#F5A623]/20 transition-colors uppercase">
                   Explore Beach Escapes
@@ -502,7 +713,7 @@ export default function LandingPage() {
                 </div>
               </div>
               <div className="p-6 pt-0">
-                <button 
+                <button
                   onClick={() => navigate('/planner', { state: { prefill: 'Plan a road trip with scenic camper campgrounds in Yosemite National Park' } })}
                   className="w-full text-center py-2.5 rounded-lg text-[10px] font-bold tracking-wider text-[#F5A623] bg-[#F5A623]/10 hover:bg-[#F5A623]/20 transition-colors uppercase">
                   Explore Campgrounds
@@ -525,7 +736,7 @@ export default function LandingPage() {
                 </div>
               </div>
               <div className="p-6 pt-0">
-                <button 
+                <button
                   onClick={() => navigate('/planner', { state: { prefill: 'Plan an alpine hiking retreat in Saint Antönien, Switzerland' } })}
                   className="w-full text-center py-2.5 rounded-lg text-[10px] font-bold tracking-wider text-[#F5A623] bg-[#F5A623]/10 hover:bg-[#F5A623]/20 transition-colors uppercase">
                   Explore Valleys
@@ -538,12 +749,12 @@ export default function LandingPage() {
         {/* ── TRIP PLANNER DESCENT ENGINE (Interactive input panel) ── */}
         <section className="max-w-3xl mx-auto py-8 px-4">
           <div className="relative rounded-3xl overflow-hidden border border-[#F5A623]/20 shadow-2xl p-8 md:p-12 transition-all duration-500 hover:border-[#F5A623]/40 hover:shadow-[0_20px_50px_rgba(245,166,35,0.15)] group/panel space-y-6">
-            
+
             {/* Background artwork layer */}
             <div className="absolute inset-0 z-0">
-              <img 
-                src="/railway-scenery.jpg" 
-                alt="Railway Scenery Background" 
+              <img
+                src="/railway-scenery.jpg"
+                alt="Railway Scenery Background"
                 className="w-full h-full object-cover transition-transform duration-700 group-hover/panel:scale-105 animate-slow-zoom-pan"
               />
               {/* Radial gradient glow overlay to blend with #0D1B2A page background */}
@@ -562,7 +773,7 @@ export default function LandingPage() {
                 </p>
               </div>
 
-              <textarea 
+              <textarea
                 value={demoInput}
                 onChange={e => setDemoInput(e.target.value)}
                 placeholder="Plan a 7-day road trip from California to Yosemite, under $2500, focusing on cozy cabins and scenic hikes..."
@@ -578,7 +789,7 @@ export default function LandingPage() {
                   { emoji: '🐪', label: 'Sahara Desert Merzouga' },
                   { emoji: '🏔️', label: 'Swiss Alps Sanctuary' }
                 ].map((tag, idx) => (
-                  <button 
+                  <button
                     key={idx}
                     onClick={() => setDemoInput(`Plan a trip details: ${tag.label} — arrange travel plans, local hotels and detailed routes`)}
                     className="px-3 py-1.5 rounded-full text-[10px] font-bold text-slate-300 border border-slate-800 bg-slate-950/80 hover:border-[#F5A623] hover:text-[#F5A623] transition-all cursor-pointer font-mono">
@@ -588,13 +799,292 @@ export default function LandingPage() {
               </div>
 
               <div className="pt-2">
-                <button 
+                <button
                   onClick={handleDemoGenerate}
                   className="w-full py-4 rounded-xl text-white font-bold text-xs tracking-widest uppercase transition-all shadow-lg flex items-center justify-center gap-2 group cursor-pointer bg-[#E8650A] hover:bg-[#E8650A]/90 hover:shadow-[0_0_20px_rgba(232,101,10,0.4)]"
                 >
                   <span>Generate Travel Plan</span>
                   <ArrowRight size={13} className="transition-transform group-hover:translate-x-1" />
                 </button>
+              </div>
+            </div>
+
+          </div>
+        </section>
+
+
+
+
+
+
+
+        {/* ── DESTINATION DISCOVERY QUIZ + SONAR RADAR ── */}
+        <section className="reveal-on-scroll py-4">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
+
+            {/* Left Column: Quiz Panel */}
+            <div className="lg:col-span-7 space-y-8">
+              <div className="space-y-2">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-[#F5A623]/20 bg-[#F5A623]/5 text-[#F5A623] text-[9px] font-bold tracking-[0.25em] uppercase font-mono">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#F5A623] animate-pulse" />
+                  Destination Finder — AI Quiz
+                </div>
+                <h2 className="text-3xl lg:text-4xl font-extrabold text-white tracking-tight" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+                  Where Should<br />You Go Next?
+                </h2>
+                <p className="text-xs text-slate-400 leading-relaxed font-mono max-w-sm">
+                  Answer 5 short questions and our algorithm maps your personality to the perfect destination — watch the radar scan narrow it down live.
+                </p>
+              </div>
+
+              {/* Step Indicator */}
+              <div className="flex items-center gap-1.5">
+                {[1, 2, 3, 4, 5].map(step => (
+                  <div
+                    key={step}
+                    className="h-[3px] rounded-full transition-all duration-500"
+                    style={{
+                      width: step <= quizStep ? '32px' : '12px',
+                      background: step < quizStep ? '#F5A623' : step === quizStep ? '#E8650A' : '#1e293b'
+                    }}
+                  />
+                ))}
+                <span className="ml-2 text-[10px] font-mono text-slate-500">
+                  {quizStep <= 5 ? `${quizStep}/5` : 'Done'}
+                </span>
+              </div>
+
+              {quizStep <= 5 ? (
+                /* Question View */
+                <div className="space-y-5">
+                  {(() => {
+                    const q = QUIZ_QUESTIONS[quizStep - 1];
+                    return (
+                      <>
+                        <div className="space-y-1">
+                          <p className="text-[10px] font-mono text-[#F5A623] uppercase tracking-widest">Q{quizStep} of 5</p>
+                          <h3 className="text-lg font-bold text-white" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+                            {q.title}
+                          </h3>
+                          <p className="text-[11px] text-slate-500 font-mono">{q.subtitle}</p>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2.5">
+                          {q.options.map(option => (
+                            <button
+                              key={option.value}
+                              onClick={() => handleSelectOption(q.key, option.value)}
+                              className="flex items-center justify-between gap-2 px-4 py-3 rounded-xl border border-slate-800 bg-slate-950/60 hover:bg-[#0f172a] hover:border-[#E8650A]/50 hover:shadow-[0_0_14px_rgba(232,101,10,0.15)] transition-all cursor-pointer group/btn text-left"
+                            >
+                              <div className="flex items-center gap-2.5">
+                                <span className="text-lg">{option.emoji}</span>
+                                <span className="text-xs font-semibold text-slate-300 group-hover/btn:text-white transition-colors">{option.label}</span>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+
+                        {quizStep > 1 && (
+                          <button
+                            onClick={() => setQuizStep(quizStep - 1)}
+                            className="text-[10px] font-bold text-slate-500 hover:text-white flex items-center gap-1.5 cursor-pointer uppercase font-mono"
+                          >
+                            ← Back
+                          </button>
+                        )}
+                      </>
+                    );
+                  })()}
+                </div>
+              ) : (
+                /* Result View */
+                <div className="space-y-6 animate-[fadeIn_0.5s_ease-out]">
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-emerald-900/40 bg-emerald-950/20 text-emerald-400 text-[9px] font-bold tracking-widest uppercase font-mono">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    Target Acquired
+                  </div>
+
+                  <div className="space-y-2">
+                    <span className="text-[10px] font-bold tracking-[0.25em] text-[#F5A623] uppercase font-mono block">Your Match</span>
+                    <h3 className="text-3xl font-extrabold text-white" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+                      {quizRecommendation?.name}
+                    </h3>
+                    <p className="text-xs text-slate-400 leading-relaxed font-mono max-w-sm">
+                      {quizRecommendation?.desc}
+                    </p>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <button
+                      onClick={() => navigate('/planner', { state: { prefilledPrompt: quizRecommendation?.query } })}
+                      className="px-6 py-3 rounded-xl bg-[#E8650A] hover:bg-[#E8650A]/90 hover:shadow-[0_0_20px_rgba(232,101,10,0.4)] text-white text-xs font-bold uppercase tracking-widest transition-all cursor-pointer flex items-center justify-center gap-2 group"
+                    >
+                      <span>Plan this Trip</span>
+                      <span className="transition-transform group-hover:translate-x-1">→</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setQuizStep(1);
+                        setQuizAnswers({ vibe: '', companion: '', budget: '', duration: '', dealbreaker: '' });
+                        setQuizRecommendation(null);
+                      }}
+                      className="px-6 py-3 rounded-xl border border-slate-800 bg-slate-950/60 hover:bg-slate-950 text-slate-300 text-xs font-bold uppercase tracking-widest transition-all cursor-pointer text-center"
+                    >
+                      Restart
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Right Column: Futuristic Sonar Radar Terminal */}
+            <div className="lg:col-span-5 flex justify-center relative">
+              <div className="relative w-72 h-72">
+                {/* Outer glow ring */}
+                <div className="absolute inset-[-8px] rounded-full border border-[#E8650A]/10 animate-[spin_30s_linear_infinite]" />
+                <div className="absolute inset-[-18px] rounded-full border border-[#F5A623]/5 animate-[spin_50s_linear_infinite_reverse]" />
+
+                {/* Coordinate labels */}
+                <span className="absolute -top-6 left-1/2 -translate-x-1/2 text-[8px] font-mono text-slate-600 tracking-widest">000°</span>
+                <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[8px] font-mono text-slate-600 tracking-widest">180°</span>
+                <span className="absolute top-1/2 -left-8 -translate-y-1/2 text-[8px] font-mono text-slate-600 tracking-widest">270°</span>
+                <span className="absolute top-1/2 -right-8 -translate-y-1/2 text-[8px] font-mono text-slate-600 tracking-widest">090°</span>
+
+                {/* Radar circle body */}
+                <div className="w-full h-full rounded-full border border-slate-800 bg-slate-950/90 shadow-[0_0_60px_rgba(232,101,10,0.12),inset_0_0_40px_rgba(0,0,0,0.8)] relative overflow-hidden flex items-center justify-center">
+
+                  {/* Radial background gradient */}
+                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(245,166,35,0.03)_0%,_transparent_65%)] pointer-events-none" />
+
+                  {/* SVG Radar Canvas */}
+                  <svg className="w-full h-full absolute inset-0 z-10 pointer-events-none" viewBox="0 0 320 320">
+                    <defs>
+                      <radialGradient id="radarCenterGlow" cx="50%" cy="50%" r="50%">
+                        <stop offset="0%" stopColor="#E8650A" stopOpacity="0.35" />
+                        <stop offset="100%" stopColor="#E8650A" stopOpacity="0" />
+                      </radialGradient>
+                      <radialGradient id="sweepFadeGlow" cx="50%" cy="50%" r="50%">
+                        <stop offset="0%" stopColor="#F5A623" stopOpacity="0.55" />
+                        <stop offset="85%" stopColor="#F5A623" stopOpacity="0.05" />
+                        <stop offset="100%" stopColor="#F5A623" stopOpacity="0" />
+                      </radialGradient>
+                    </defs>
+
+                    {/* Concentric sonar rings */}
+                    <circle cx="160" cy="160" r="30" stroke="#1e293b" strokeWidth="1" fill="none" opacity="0.5" />
+                    <circle cx="160" cy="160" r="60" stroke="#1e293b" strokeWidth="1" fill="none" opacity="0.55" strokeDasharray="3 3" />
+                    <circle cx="160" cy="160" r="95" stroke="#1e293b" strokeWidth="1" fill="none" opacity="0.6" />
+                    <circle cx="160" cy="160" r="128" stroke="#1e293b" strokeWidth="1.5" fill="none" opacity="0.7" strokeDasharray="5 7" />
+                    <circle cx="160" cy="160" r="148" stroke="#E8650A" strokeWidth="0.8" fill="none" opacity="0.2" />
+
+                    {/* Crosshair dashed axes */}
+                    <line x1="160" y1="10" x2="160" y2="310" stroke="#1e293b" strokeWidth="0.8" opacity="0.4" strokeDasharray="2 2" />
+                    <line x1="10" y1="160" x2="310" y2="160" stroke="#1e293b" strokeWidth="0.8" opacity="0.4" strokeDasharray="2 2" />
+
+                    {/* Cardinal tick marks */}
+                    <line x1="160" y1="10" x2="160" y2="18" stroke="#475569" strokeWidth="1.5" opacity="0.7" />
+                    <line x1="160" y1="302" x2="160" y2="310" stroke="#475569" strokeWidth="1.5" opacity="0.7" />
+                    <line x1="10" y1="160" x2="18" y2="160" stroke="#475569" strokeWidth="1.5" opacity="0.7" />
+                    <line x1="302" y1="160" x2="310" y2="160" stroke="#475569" strokeWidth="1.5" opacity="0.7" />
+
+                    {/* 45° diagonal ticks */}
+                    <line x1="55" y1="55" x2="61" y2="61" stroke="#334155" strokeWidth="1" opacity="0.5" />
+                    <line x1="265" y1="55" x2="259" y2="61" stroke="#334155" strokeWidth="1" opacity="0.5" />
+                    <line x1="55" y1="265" x2="61" y2="259" stroke="#334155" strokeWidth="1" opacity="0.5" />
+                    <line x1="265" y1="265" x2="259" y2="259" stroke="#334155" strokeWidth="1" opacity="0.5" />
+
+                    {/* Rotating sonar sweep group */}
+                    <g className="radar-sweep-group">
+                      {/* Sweep wedge arc (≈60° arc from top) */}
+                      <path
+                        d="M 160 160 L 160 12 A 148 148 0 0 1 244.2 42 Z"
+                        fill="url(#sweepFadeGlow)"
+                        opacity="0.6"
+                      />
+                      {/* Leading scan line */}
+                      <line x1="160" y1="160" x2="160" y2="12" stroke="#F5A623" strokeWidth="1.5" opacity="0.9" />
+                    </g>
+
+                    {/* Center amber glow disc */}
+                    <circle cx="160" cy="160" r="30" fill="url(#radarCenterGlow)" />
+
+                    {/* Flight Arcs (Dynamic Visibility) */}
+                    {[
+                      { key: "Morocco", cx: 105, cy: 130, steps: [1, 2] },
+                      { key: "Alps", cx: 120, cy: 100, steps: [1, 2, 3] },
+                      { key: "Yosemite", cx: 62, cy: 108, steps: [1, 2, 3, 4] },
+                      { key: "Kyoto", cx: 218, cy: 122, steps: [1, 2, 3, 4] },
+                      { key: "Spain", cx: 110, cy: 118, steps: [1, 2, 3, 4, 5] }
+                    ].map((node, index) => {
+                      let isActive = false;
+                      if (quizStep <= 5) {
+                        isActive = node.steps.includes(quizStep) || index % 3 === (quizStep % 3);
+                      } else {
+                        isActive = quizRecommendation?.name?.includes(node.key) ||
+                          (quizRecommendation?.name?.includes("Switzerland") && node.key === "Alps");
+                      }
+                      const isChosen = quizStep > 5 && isActive;
+
+                      return (
+                        <g key={node.key} style={{ opacity: isActive ? 1 : 0.07, transition: 'opacity 700ms ease' }}>
+                          <path
+                            d={`M 160 160 Q ${(160 + node.cx) / 2} ${((160 + node.cy) / 2) - 38} ${node.cx} ${node.cy}`}
+                            stroke={isChosen ? "#F5A623" : "#E8650A"}
+                            strokeWidth={isChosen ? "2.5" : "1.2"}
+                            fill="none"
+                            className={isActive ? "flight-path-arc" : ""}
+                          />
+                          <circle
+                            cx={node.cx}
+                            cy={node.cy}
+                            r={isChosen ? "5" : "3"}
+                            fill={isChosen ? "#F5A623" : "#334155"}
+                            className={isActive ? "globe-destination-marker" : ""}
+                          />
+                        </g>
+                      );
+                    })}
+
+                    {/* Origin dot with ping */}
+                    <circle cx="160" cy="160" r="4.5" fill="#E8650A" />
+                    <circle cx="160" cy="160" r="12" stroke="#E8650A" strokeWidth="1" fill="none" className="animate-ping" style={{ animationDuration: '3s' }} />
+
+                    {/* Destination pin (quiz complete) */}
+                    {quizStep > 5 && quizRecommendation && (() => {
+                      const pins = [
+                        { key: "Alps", cx: 120, cy: 100, label: "Swiss Alps" },
+                        { key: "Yosemite", cx: 62, cy: 108, label: "Yosemite" },
+                        { key: "Kyoto", cx: 218, cy: 122, label: "Kyoto" },
+                        { key: "Spain", cx: 110, cy: 118, label: "Spain" },
+                        { key: "Morocco", cx: 105, cy: 130, label: "Morocco" }
+                      ];
+                      const pin = pins.find(p =>
+                        quizRecommendation.name.includes(p.key) ||
+                        (quizRecommendation.name.includes("Switzerland") && p.key === "Alps")
+                      );
+                      if (!pin) return null;
+                      return (
+                        <g>
+                          <circle cx={pin.cx} cy={pin.cy} r="7" fill="#F5A623" />
+                          <circle cx={pin.cx} cy={pin.cy} r="20" stroke="#F5A623" strokeWidth="1.5" fill="none" className="animate-ping" />
+                          <text x={pin.cx} y={pin.cy - 16} fill="#FFFFFF" fontSize="8" fontWeight="bold" fontFamily="monospace" textAnchor="middle">
+                            {pin.label.toUpperCase()}
+                          </text>
+                        </g>
+                      );
+                    })()}
+                  </svg>
+
+                  {/* Center status readout */}
+                  <div className="relative z-20 text-center pointer-events-none">
+                    <p className="text-[7px] font-mono text-[#F5A623]/60 tracking-[0.3em] uppercase">
+                      {quizStep <= 5 ? `Scanning Q${quizStep}` : 'Target Locked'}
+                    </p>
+                    <p className="text-[8px] font-mono text-slate-600 mt-0.5">
+                      {quizStep <= 5 ? `${5 - quizStep + 1} signals remaining` : quizRecommendation?.name?.split(',')[0]}
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -693,10 +1183,15 @@ export default function LandingPage() {
 
           <div className="flex items-center gap-6">
             {['Home', 'Planner', 'Dashboard', 'Terms'].map(link => (
-              <a 
-                key={link} 
+              <a
+                key={link}
                 href="#"
-                onClick={(e) => { e.preventDefault(); if (link === 'Planner') navigate('/planner'); else if (link==='Dashboard') navigate('/my-trips'); }}
+                onClick={(e) => {
+                  e.preventDefault();
+                  if (link === 'Home') navigate('/');
+                  else if (link === 'Planner') navigate('/planner');
+                  else if (link === 'Dashboard') navigate('/my-trips');
+                }}
                 className="text-[10px] font-bold tracking-widest text-slate-400 hover:text-white uppercase transition-colors">
                 {link}
               </a>

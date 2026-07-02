@@ -436,7 +436,18 @@ async def hotel_agent(state: TravelState) -> dict:
         source_name="tavily_hotels",
     )
 
-    hotel_data = result.data or "No hotel data available."
+    raw_hotel_data = result.data or "No hotel data available."
+    tavily_links = []
+
+    # If Tavily returns a dictionary, safely unpack the structured text and booking links
+    if isinstance(raw_hotel_data, dict):
+        tavily_links = raw_hotel_data.get("booking_links", [])
+        hotel_data = raw_hotel_data.get("text", "No hotel data available.")
+    else:
+        hotel_data = raw_hotel_data
+
+    if not isinstance(hotel_data, str):
+        hotel_data = str(hotel_data)
 
     # Intercept fallback errors and inject high-quality curated options
     if "temporarily unavailable" in hotel_data or len(hotel_data.strip()) < 50:
@@ -457,6 +468,10 @@ async def hotel_agent(state: TravelState) -> dict:
             "url": f"https://www.agoda.com/search?city={destination.replace(' ', '+')}",
             "type": "hotel",
         })
+    
+    # Merge custom links found by the Tavily search
+    if tavily_links:
+        booking_links.extend(tavily_links)
 
     progress.append(emit_progress(state, "hotel_agent", "Hotel research complete", done=True))
 
