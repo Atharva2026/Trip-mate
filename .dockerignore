@@ -1,7 +1,20 @@
 # Environments
-.venv
+.venv/
 env/
 venv/
 ENV/
 env.bak/
 venv.bak/
+
+# Git
+.git/
+.gitignore
+
+# Cache
+**/__pycache__/
+**/*.pyc
+
+# Node / Build artifacts
+**/node_modules/
+frontend/dist/
+frontend/node_modules/
