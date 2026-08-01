@@ -1,0 +1,24 @@
+# TripMate AI Premium Features Execution Checklist
+
+- `[x]` **Create Helper Tools**
+  - `[x]` `wikipedia_tool.py` (Wikipedia API search & summary fallback)
+  - `[x]` `overpass_tool.py` (OSM Overpass query for eateries, restrooms, ATMs, hospitals)
+  - `[x]` `currency_tool.py` (Exchange rate converter)
+  - `[x]` `sunrise_tool.py` (Sunrise-Sunset API astronomy timings)
+  - `[x]` `route_tool.py` (Heuristic nearest-neighbor TSP route optimizer)
+- `[x]` **Update Core Framework**
+  - `[x]` `backend/core/cache.py` (Add new namespaces & TTL kinds)
+  - `[x]` `backend/core/resilient.py` (Circuit breakers, retries, and agent metrics logger)
+- `[x]` **Update LangGraph Orchestration**
+  - `[x]` Extend `TravelState` with new schema fields
+  - `[x]` Restructure graph to execute flight, hotel, itinerary, and retrievers in parallel
+  - `[x]` Implement programmatic validation pipeline (`Budget`, `Schedule`, `Geo`, `Final` validators)
+  - `[x]` Add `TravelInsightsAgent` (curating food, writing stories with confidence score, and safety tips)
+  - `[x]` Setup stateful What-if simulator endpoint in `app.py`
+- `[x]` **Refactor Frontend Interface**
+  - `[x]` `Dashboard.jsx` (New Tabs, Budget Guardian, What-if Simulator, and Dev Observability Drawer)
+  - `[x]` `MapView.jsx` (Multi-color pins, sequential route lines, and toggle filters)
+- `[x]` **Verification & Walkthrough**
+  - `[x]` Run py_compile checks
+  - `[x]` Build frontend and test routes
+  - `[x]` Create `walkthrough.md` summary

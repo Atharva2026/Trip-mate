@@ -186,3 +186,24 @@ async def safe_tool_call(
         latency_ms=latency,
         error=last_error,
     )
+
+
+@dataclass
+class AgentMetric:
+    agent: str
+    latency_ms: float
+    cache_hit: bool = False
+    llm_tokens: int = 0
+    api_calls: int = 0
+    success: bool = True
+
+    def to_dict(self) -> dict:
+        return {
+            "agent": self.agent,
+            "latency_ms": round(self.latency_ms, 1),
+            "cache_hit": self.cache_hit,
+            "llm_tokens": self.llm_tokens,
+            "api_calls": self.api_calls,
+            "success": self.success
+        }
+

@@ -273,7 +273,7 @@ def resolve_location_to_iata(location: str):
         if location_clean in name:
             score += 50
 
-        if "international" in name:
+        if score > 0 and "international" in name:
             score += 10
 
         if score > 0:
@@ -355,69 +355,52 @@ def parse_route(query: str):
     codes = re.findall(r"\b[A-Z]{3}\b", q)
 
     if len(codes) >= 2:
-        dep = codes[0].upper()
-        arr = codes[1].upper()
-        return dep, arr
+        return codes[0].upper(), codes[1].upper()
 
-    # Pattern: from X to Y
-    match = re.search(
-        r"\bfrom\s+(.+?)\s+\bto\s+(.+?)(?:\s+(?:on|for|under|including|with|in|at)\b|[.!?]|$)",
-        q_lower,
-    )
-
-    if match:
-        origin_text = match.group(1)
-        dest_text = match.group(2)
-
-        dep_iata = resolve_location_to_iata(origin_text)
-        arr_iata = resolve_location_to_iata(dest_text)
-
-        return dep_iata, arr_iata
-
-    # Pattern: to Y from X
-    match = re.search(
-        r"\bto\s+(.+?)\s+\bfrom\s+(.+?)(?:\s+(?:on|for|under|including|with|in|at)\b|[.!?]|$)",
-        q_lower,
-    )
-
-    if match:
-        dest_text = match.group(1)
-        origin_text = match.group(2)
-
-        dep_iata = resolve_location_to_iata(origin_text)
-        arr_iata = resolve_location_to_iata(dest_text)
-
-        return dep_iata, arr_iata
-
-    # Pattern: flights from X
-    match = re.search(r"\bfrom\s+(.+?)(?:[.!?]|$)", q_lower)
-
-    if match:
-        origin_text = match.group(1)
-        dep_iata = resolve_location_to_iata(origin_text)
-        return dep_iata, None
-
-    # Pattern: flights to X
-    match = re.search(r"\bto\s+(.+?)(?:[.!?]|$)", q_lower)
-
-    if match:
-        dest_text = match.group(1)
-        arr_iata = resolve_location_to_iata(dest_text)
-        return None, arr_iata
-
-    # Fallback: find country/city mentions
     mentions = find_location_mentions(q)
+    if not mentions:
+        return None, None
 
+    dep_mention = None
+    arr_mention = None
+
+    # Identify explicit departure (preceded by 'from')
+    for m in mentions:
+        if re.search(rf"\bfrom\s+{re.escape(m)}\b", q_lower):
+            dep_mention = m
+            break
+
+    # Identify explicit arrival (preceded by 'to')
+    for m in mentions:
+        if re.search(rf"\bto\s+{re.escape(m)}\b", q_lower):
+            arr_mention = m
+            break
+
+    # If we have two mentions and only one was bound, bind the other to the remaining slot
     if len(mentions) >= 2:
-        dep_iata = resolve_location_to_iata(mentions[0])
-        arr_iata = resolve_location_to_iata(mentions[1])
-        return dep_iata, arr_iata
+        if dep_mention and not arr_mention:
+            arr_mention = next((m for m in mentions if m != dep_mention), None)
+        elif arr_mention and not dep_mention:
+            dep_mention = next((m for m in mentions if m != arr_mention), None)
 
-    if len(mentions) == 1:
-        arr_iata = resolve_location_to_iata(mentions[0])
-        return DEFAULT_ORIGIN_IATA, arr_iata
+    # Resolve to IATA codes
+    dep_iata = resolve_location_to_iata(dep_mention) if dep_mention else None
+    arr_iata = resolve_location_to_iata(arr_mention) if arr_mention else None
 
-    return None, None
+    # Fallbacks
+    if not dep_iata and not arr_iata:
+        if len(mentions) == 1:
+            arr_iata = resolve_location_to_iata(mentions[0])
+            dep_iata = DEFAULT_ORIGIN_IATA
+        else:
+            arr_iata = resolve_location_to_iata(mentions[0])
+            dep_iata = DEFAULT_ORIGIN_IATA
+    elif arr_iata and not dep_iata:
+        dep_iata = DEFAULT_ORIGIN_IATA
+    elif dep_iata and not arr_iata:
+        pass
+
+    return dep_iata, arr_iata
 
 
 def format_flight(flight: dict):

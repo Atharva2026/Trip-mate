@@ -346,9 +346,20 @@ async def travel_planner(request_data: TravelRequest, background_tasks: Backgrou
                 "map_locations": result["map_locations"],
                 "weather": result["weather"],
                 "validation_report": result["validation_report"],
+                "hidden_places": result["hidden_places"],
+                "food_recommendations": result["food_recommendations"],
+                "culture_and_language": result["culture_and_language"],
+                "budget_estimates": result["budget_estimates"],
+                "safety_report": result["safety_report"],
+                "photo_plan": result["photo_plan"],
+                "optimized_route_meta": result["optimized_route_meta"],
+                "alerts": result["alerts"],
+                "agent_metrics": result["agent_metrics"],
+                "currency_data": result["currency_data"],
                 "data_freshness": result["data_freshness"],
                 "tool_call_log": result["tool_call_log"],
                 "llm_calls": result["llm_calls"],
+                "travel_context": result.get("travel_context", {}),
             }
         )
 
@@ -376,12 +387,15 @@ async def travel_stream(thread_id: str):
         try:
             while True:
                 try:
-                    # Retrieve next progress event from the queue with a 2.0s timeout
+                    # Retrieve next progress event from the queue with a 30.0s timeout
                     event = await asyncio.wait_for(queue.get(), timeout=30.0)
                     yield f"data: {json.dumps(event)}\n\n"
                     
-                    # Close connection if finalized or error occurs
-                    if event.get("done") and (event.get("node") == "final_agent" or event.get("node") == "error"):
+                    # Only close connection if the final_agent event contains the result payload or if error occurs
+                    if event.get("done") and (
+                        (event.get("node") == "final_agent" and "payload" in event) or 
+                        event.get("node") == "error"
+                    ):
                         await asyncio.sleep(5.0)
                         break
                 except asyncio.TimeoutError:
@@ -392,7 +406,85 @@ async def travel_stream(thread_id: str):
         finally:
             sse_manager.remove_queue(thread_id)
 
-    return StreamingResponse(event_generator(), media_type="text/event-stream")
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        }
+    )
+
+class WhatIfRequest(BaseModel):
+    thread_id: str
+    message: str
+    travel_context: dict | None = None
+
+
+@app.post("/api/travel/whatif")
+async def travel_whatif(request_data: WhatIfRequest, background_tasks: BackgroundTasks, request: Request):
+    try:
+        user_id = await get_current_user_id(request)
+        thread_id = request_data.thread_id
+        user_message = request_data.message.strip()
+        
+        if not thread_id:
+            raise HTTPException(status_code=400, detail="thread_id is required for what-if simulation.")
+            
+        sse_manager.get_queue(thread_id)
+
+        async def run_whatif_in_background():
+            try:
+                result = await run_travel_agent(
+                    user_input=user_message,
+                    thread_id=thread_id,
+                    travel_context=request_data.travel_context,
+                    user_id=user_id
+                )
+                
+                # Auto-save updated trip
+                dest = request_data.travel_context.get("destination") if request_data.travel_context else ""
+                await save_trip(
+                    trip_id=thread_id,
+                    user_id=user_id,
+                    title=f"Trip to {dest.title() if dest else 'Custom'}",
+                    destination=dest,
+                    query=user_message,
+                    result_json=result
+                )
+
+                sse_manager.push(thread_id, {
+                    "node": "final_agent",
+                    "message": "What-if re-planning complete",
+                    "done": True,
+                    "payload": result
+                })
+            except Exception as e:
+                logger.error(f"Error in What-if background task: {e}")
+                sse_manager.push(thread_id, {
+                    "node": "error",
+                    "message": f"What-if simulation failed: {str(e)}",
+                    "done": True
+                })
+
+        background_tasks.add_task(run_whatif_in_background)
+        return {"success": True, "status": "started", "thread_id": thread_id}
+    except Exception as e:
+        logger.error(f"Error in travel_whatif: {e}")
+        return JSONResponse(status_code=500, content={"success": False, "error": str(e)})
+
+
+@app.get("/api/geocode")
+async def geocode_endpoint(q: str):
+    """Geocode helper route for custom additions on the frontend."""
+    from tools.geocode_tool import geocode_location
+    if not q:
+        raise HTTPException(status_code=400, detail="Query parameter 'q' is required.")
+    
+    # Run in threadpool as Nominatim request is synchronous
+    res = await run_in_threadpool(geocode_location, q)
+    return res
 
 
 # =========================

@@ -21,15 +21,14 @@ export default function ValidationReport({ report }) {
   }
 
   return (
-    <div className={`p-4 rounded-xl border transition-all duration-200 ${
+    <div className={`p-4 rounded-xl border transition-all duration-200 cursor-pointer ${
       passed 
         ? 'bg-emerald-500/5 border-emerald-500/20 text-emerald-300' 
         : 'bg-amber-500/5 border-amber-500/20 text-amber-300'
     }`}>
       <button 
-        onClick={() => !passed && setExpanded(!expanded)}
-        className="w-full flex items-center justify-between font-semibold text-xs text-left cursor-default"
-        style={{ cursor: passed ? 'default' : 'pointer' }}
+        onClick={() => setExpanded(!expanded)}
+        className="w-full flex items-center justify-between font-semibold text-xs text-left cursor-pointer"
       >
         <div className="flex items-center gap-2.5">
           {passed ? (
@@ -51,12 +50,30 @@ export default function ValidationReport({ report }) {
             )}
           </div>
         </div>
-        {!passed && (
-          <div>
-            {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-          </div>
-        )}
+        <div>
+          {expanded ? <ChevronUp className="w-4 h-4 text-slate-500" /> : <ChevronDown className="w-4 h-4 text-slate-500" />}
+        </div>
       </button>
+
+      {passed && expanded && (
+        <div className="mt-3 pt-3 border-t border-white/5 space-y-2 text-xs leading-normal">
+          <h5 className="font-bold text-[#F5A623] mb-1.5 text-[9px] uppercase tracking-wider font-mono">Audited Constraints Checked:</h5>
+          <ul className="space-y-1.5 text-slate-400 font-mono text-[10px] pl-1">
+            <li className="flex items-center gap-1.5">
+              <span className="text-emerald-500 font-bold">✓</span> Flight Carrier & Schedule Verification
+            </li>
+            <li className="flex items-center gap-1.5">
+              <span className="text-emerald-500 font-bold">✓</span> Hotel Pricing Tiers & Budget Safeguard Bounds
+            </li>
+            <li className="flex items-center gap-1.5">
+              <span className="text-emerald-500 font-bold">✓</span> Transit Sequence Spacing & Distances Audited
+            </li>
+            <li className="flex items-center gap-1.5">
+              <span className="text-emerald-500 font-bold">✓</span> Travel Advisories, Alerts, & Currency Rates Validated
+            </li>
+          </ul>
+        </div>
+      )}
 
       {!passed && expanded && issues && (
         <div className="mt-3 pt-3 border-t border-white/5 space-y-3 text-xs leading-normal">

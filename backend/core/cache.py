@@ -33,6 +33,11 @@ CACHE_TTL = {
     "weather": 60 * 60 * 3,           # 3 hours
     "geocode": 60 * 60 * 24 * 30,     # essentially static — 30 days
     "intent": 60 * 60,                # supervisor classification — 1 hour
+    "etiquette": 60 * 60 * 24 * 30,   # 30 days
+    "stories": 60 * 60 * 24 * 30,     # 30 days
+    "restaurants": 60 * 60 * 24 * 7,  # 7 days
+    "safety": 60 * 60 * 12,           # 12 hours
+    "currency": 60 * 60 * 12,         # 12 hours
     "default": 60 * 15,               # fallback: 15 min
 }
 
